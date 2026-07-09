@@ -88,6 +88,11 @@ Route::middleware(['auth', 'verified', 'role:Administrador|Gerente|Medico|Enferm
         Route::post('/{id}/enviar', [QuoteManageController::class, 'send'])->name('send');
         Route::delete('/{id}', [QuoteManageController::class, 'destroy'])->name('destroy');
         Route::get('/{id}/pdf', [QuoteManageController::class, 'print'])->name('pdf');
+        Route::post('/{id}/aprovar', [QuoteManageController::class, 'approve'])->name('approve');
+        Route::post('/{id}/recusar', [QuoteManageController::class, 'reject'])->name('reject');
+        Route::post('/{id}/enviar', [QuoteManageController::class, 'send'])->name('send');
+        Route::post('/{id}/marcar-paga', [QuoteManageController::class, 'markAsPaid'])->name('markAsPaid');
+        Route::post('/{id}/converter', [QuoteManageController::class, 'convertToConsultation'])->name('convert');
     });
 
     // Financeiro
