@@ -10,9 +10,17 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
-    ->withMiddleware(function (Middleware $middleware): void {
-        //
+    ->withMiddleware(function (Middleware $middleware) {
+        // Alias de middleware personalizados
+        $middleware->alias([
+            'role' => \App\Http\Middleware\CheckRole::class,
+            'patient.auth' => \App\Http\Middleware\PatientAuth::class,
+        ]);
+
+        // Redirecionamentos de autenticação
+        $middleware->redirectUsersTo('/dashboard');
+        $middleware->redirectGuestsTo('/login');
     })
-    ->withExceptions(function (Exceptions $exceptions): void {
+    ->withExceptions(function (Exceptions $exceptions) {
         //
     })->create();
