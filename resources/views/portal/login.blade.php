@@ -74,6 +74,11 @@
                         <i class="fas fa-sign-in-alt mr-2"></i>ENTRAR
                     </button>
                 </form>
+                <div class="mt-4 text-center">
+                    <a href="{{ route('patient.password.recovery') }}" class="text-sm text-emerald-600 hover:text-emerald-800 font-medium">
+                        <i class="fas fa-key mr-1"></i> Esqueci minha senha
+                    </a>
+                </div>
 
                 <div class="mt-6 space-y-3 text-center">
                     <a href="{{ route('patient.register') }}" class="block w-full py-3 px-4 border-2 border-emerald-600 text-emerald-600 hover:bg-emerald-50 font-semibold rounded-xl transition">

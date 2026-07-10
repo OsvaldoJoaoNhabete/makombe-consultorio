@@ -29,6 +29,9 @@ class Patient extends Authenticatable
         'is_active',
         'created_by',
         'photo_path',
+        'password_reset_token',
+        'password_reset_expires',
+        'first_login_at', // ← NOVO
     ];
 
     protected $hidden = [
@@ -37,11 +40,13 @@ class Patient extends Authenticatable
     ];
 
     protected $casts = [
-        'birth_date' => 'date',
-        'email_verified_at' => 'datetime',
-        'is_active' => 'boolean',
-        'password' => 'hashed',
-    ];
+    'birth_date' => 'date',
+    'email_verified_at' => 'datetime',
+    'password_reset_expires' => 'datetime',
+    'first_login_at' => 'datetime', // ← NOVO
+    'is_active' => 'boolean',
+    'password' => 'hashed',
+];
 
     // ============================================
     // RELAÇÕES
@@ -78,6 +83,35 @@ class Patient extends Authenticatable
     {
         return $this->belongsTo(User::class, 'created_by');
     }
+
+// ============================================
+// MÉTODOS DE CONTROLO DE PRIMEIRO ACESSO
+// ============================================
+
+/**
+ * Verificar se é o primeiro acesso (nunca alterou a senha)
+ */
+public function isFirstAccess(): bool
+{
+    return $this->first_login_at === null;
+}
+
+/**
+ * Marcar primeiro acesso como feito
+ */
+public function markFirstAccessDone(): void
+{
+    $this->update(['first_login_at' => now()]);
+}
+
+/**
+ * Verificar se precisa alterar senha (primeiro acesso ou senha muito antiga)
+ */
+public function needsPasswordChange(): bool
+{
+    return $this->first_login_at === null;
+}
+
 
     // ============================================
     // HELPERS

@@ -43,6 +43,11 @@
             <a href="{{ route('dashboard') }}" class="nav-item {{ request()->routeIs('dashboard') ? 'active' : '' }}">
                 <i class="fas fa-tachometer-alt w-6"></i> Dashboard
             </a>
+
+            <a href="{{ route('admin.content.index') }}" class="nav-item {{ request()->routeIs('admin.content.*') ? 'active' : '' }}">
+                <i class="fas fa-globe w-6"></i> Gestão de Conteúdo
+            </a>
+
             <a href="{{ route('patients.index') }}" class="nav-item {{ request()->routeIs('patients.*') ? 'active' : '' }}">
                 <i class="fas fa-users w-6"></i> Pacientes
             </a>
