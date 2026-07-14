@@ -137,19 +137,22 @@ class FinanceController extends Controller
         return view('admin.finance.payments', compact('payments', 'stats', 'status', 'method', 'dateFrom', 'dateTo'));
     }
 
-    /**
-     * Formulário de criação
+     /**
+     * Formulário de criação de pagamento
      */
     public function createPayment()
     {
-        $patients = Patient::where('is_active', true)->orderBy('full_name')->get();
-        $consultations = Consultation::whereIn('status', ['concluida', 'em_andamento'])
-            ->whereNull('payment_status')
-            ->with('patient')
+        $patients = \App\Models\Patient::where('is_active', true)
+            ->orderBy('full_name')
+            ->get();
+
+        // Buscar consultas com pagamento pendente ou parcial para facilitar o vínculo
+        $pendingConsultations = \App\Models\Consultation::whereIn('payment_status', ['pendente', 'parcial'])
+            ->with(['patient', 'doctor'])
             ->orderByDesc('scheduled_at')
             ->get();
-        
-        return view('admin.finance.form', compact('patients', 'consultations'));
+
+        return view('admin.finance.form', compact('patients', 'pendingConsultations'));
     }
 
     /**
@@ -160,6 +163,7 @@ class FinanceController extends Controller
         $validated = $request->validate([
             'patient_id' => ['required', 'exists:patients,id'],
             'consultation_id' => ['nullable', 'exists:consultations,id'],
+            'quote_id' => ['nullable', 'exists:quotes,id'],
             'amount' => ['required', 'numeric', 'min:0.01'],
             'method' => ['required', 'in:mpesa,emola,transferencia,numerario,cheque,cartao,seguradora'],
             'reference' => ['nullable', 'string', 'max:100'],
@@ -172,9 +176,10 @@ class FinanceController extends Controller
             'method.required' => 'Selecione o método de pagamento.',
         ]);
 
-        $payment = Payment::create([
+        $payment = \App\Models\Payment::create([
             'patient_id' => $validated['patient_id'],
             'consultation_id' => $validated['consultation_id'] ?? null,
+            'quote_id' => $validated['quote_id'] ?? null,
             'amount' => $validated['amount'],
             'method' => $validated['method'],
             'reference' => $validated['reference'] ?? null,
@@ -185,12 +190,12 @@ class FinanceController extends Controller
         ]);
 
         // Atualizar status de pagamento da consulta se vinculada
-        if ($validated['consultation_id']) {
-            Consultation::where('id', $validated['consultation_id'])
+        if (!empty($validated['consultation_id'])) {
+            \App\Models\Consultation::where('id', $validated['consultation_id'])
                 ->update(['payment_status' => 'pago']);
         }
 
-        Log::info('Pagamento registado', [
+        \Log::info('Pagamento registado', [
             'payment_id' => $payment->id,
             'amount' => $payment->amount,
             'patient_id' => $payment->patient_id,

@@ -11,413 +11,320 @@
     
     <style>
         body { font-family: 'Lato', sans-serif; }
-        .sidebar { position: fixed; top: 0; left: 0; height: 100vh; width: 260px; background: white; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; z-index: 50; }
-        .nav-item { display: flex; align-items: center; padding: 0.75rem 1.5rem; color: #4b5563; text-decoration: none; transition: all 0.2s; font-size: 0.95rem; font-weight: 500; border-left: 4px solid transparent; }
-        .nav-item:hover { background-color: #f9fafb; color: #10b981; }
-        .nav-item.active { background-color: #ecfdf5; color: #10b981; border-left-color: #10b981; }
-        .main-content { margin-left: 260px; min-height: 100vh; background-color: #f9fafb; }
-        @media (max-width: 768px) { .sidebar { transform: translateX(-100%); } .sidebar.open { transform: translateX(0); } .main-content { margin-left: 0; } }
+        
+        .sidebar { 
+            position: fixed; top: 0; left: 0; height: 100vh; width: 270px; 
+            background: linear-gradient(180deg, #4c1d95 0%, #5b21b6 50%, #6d28d9 100%); 
+            display: flex; flex-direction: column; z-index: 50; 
+            transition: transform 0.3s ease;
+        }
+        .nav-item { 
+            display: flex; align-items: center; padding: 0.85rem 1.5rem; 
+            color: #ddd6fe; text-decoration: none; transition: all 0.2s ease; 
+            font-size: 0.95rem; font-weight: 500; border-left: 4px solid transparent; 
+        }
+        .nav-item:hover { background-color: rgba(255, 255, 255, 0.1); color: #ffffff; border-left-color: #a78bfa; }
+        .nav-item.active { background-color: rgba(255, 255, 255, 0.15); color: #ffffff; border-left-color: #ffffff; font-weight: 700; }
+        .nav-item i { width: 24px; text-align: center; margin-right: 12px; font-size: 1.1rem; }
+        .main-content { margin-left: 270px; min-height: 100vh; background-color: #f8fafc; }
+        
+        @media (max-width: 768px) { 
+            .sidebar { transform: translateX(-100%); } 
+            .sidebar.open { transform: translateX(0); } 
+            .main-content { margin-left: 0; } 
+        }
 
-        @media print {
-        /* Esconder tudo exceto o modal de credenciais */
-        body * {
-            visibility: hidden !important;
-        }
-        
-        #credentialsPrintArea, #credentialsPrintArea * {
-            visibility: visible !important;
-        }
-        
-        #credentialsPrintArea {
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
-            width: 100% !important;
-            padding: 10mm !important;
-            background: white !important;
-            color: black !important;
-        }
-        
-        /* Esconder botões e elementos interativos */
-        .no-print, button, .btn, nav, header, aside, footer {
-            display: none !important;
-        }
-        
-        /* Remover margens da página */
-        @page {
-            size: A4;
-            margin: 10mm;
-        }
-    }
+        /* Animações suaves */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        .delay-100 { animation-delay: 0.1s; }
+        .delay-200 { animation-delay: 0.2s; }
+        .delay-300 { animation-delay: 0.3s; }
     </style>
 </head>
-<body class="bg-gray-50">
+<body class="bg-slate-50 text-slate-800">
 
-    <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden md:hidden" onclick="toggleSidebar()"></div>
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 hidden md:hidden" onclick="toggleSidebar()"></div>
 
-    <aside class="sidebar" id="sidebar">
-        <div class="p-6 border-b border-gray-200">
-            <div class="flex items-center gap-3">
-                <div class="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg">
-                    <i class="fas fa-heartbeat text-white text-xl"></i>
-                </div>
-                <div>
-                    <h1 class="text-lg font-bold text-gray-800">MAKOMBE</h1>
-                    <p class="text-xs text-gray-500 italic">Portal do Paciente</p>
-                </div>
-            </div>
-        </div>
-
-        <nav class="flex-1 overflow-y-auto py-4 space-y-1">
-            <a href="{{ route('patient.dashboard') }}" class="nav-item active">
-                <i class="fas fa-home w-6"></i> Dashboard
-            </a>
-            <a href="{{ route('patient.schedule') }}" class="nav-item">
-                <i class="fas fa-calendar-plus w-6"></i> Agendar Consulta
-            </a>
-            <a href="{{ route('patient.consultations') }}" class="nav-item">
-                <i class="fas fa-calendar-check w-6"></i> Minhas Consultas
-            </a>
-            <a href="{{ route('patient.quotes') }}" class="nav-item">
-                <i class="fas fa-file-invoice-dollar w-6"></i> Cotações
-            </a>
-            <a href="{{ route('patient.payments') }}" class="nav-item">
-                <i class="fas fa-credit-card w-6"></i> Pagamentos
-            </a>
-            <a href="{{ route('patient.insurances') }}" class="nav-item">
-                <i class="fas fa-shield-alt w-6"></i> Seguradoras
-            </a>
-            <a href="{{ route('patient.profile') }}" class="nav-item">
-                <i class="fas fa-user w-6"></i> Meu Perfil
-            </a>
-        </nav>
-
-        <div class="p-4 border-t border-gray-200">
-            <div class="flex items-center gap-3">
-                <div class="h-10 w-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold">
-                    {{ strtoupper(substr($patient->full_name, 0, 1)) }}
-                </div>
-                <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium text-gray-900 truncate">{{ $patient->full_name }}</p>
-                    <p class="text-xs text-gray-500 truncate">{{ $patient->email }}</p>
-                </div>
-                <form method="POST" action="{{ route('patient.logout') }}" class="inline">
-                    @csrf
-                    <button type="submit" class="text-gray-400 hover:text-red-600 transition" title="Sair">
-                        <i class="fas fa-sign-out-alt"></i>
-                    </button>
-                </form>
-            </div>
-        </div>
-    </aside>
+    {{-- Sidebar Reutilizável --}}
+    <x-portal-sidebar />
 
     <div class="main-content">
-        <header class="bg-white border-b border-gray-200 px-6 py-4">
-            <div class="flex items-center justify-between">
-                <button class="md:hidden text-gray-600" onclick="toggleSidebar()">
-                    <i class="fas fa-bars text-xl"></i>
+        <header class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
+            <div class="flex items-center gap-4">
+                <button class="md:hidden text-violet-700 text-xl" onclick="toggleSidebar()">
+                    <i class="fas fa-bars"></i>
                 </button>
-                <h2 class="text-xl font-bold text-gray-800">Dashboard</h2>
-                <div></div>
+                <div>
+                    <h2 class="text-xl font-bold text-slate-800">Dashboard</h2>
+                    <p class="text-xs text-slate-500 hidden sm:block">Visão geral da sua saúde e consultas</p>
+                </div>
+            </div>
+            <div class="text-sm text-slate-500 hidden sm:flex items-center gap-2 bg-slate-100 px-3 py-1.5 rounded-lg">
+                <i class="far fa-calendar-alt text-violet-600"></i> 
+                {{ now()->locale('pt_PT')->isoFormat('DD [de] MMMM [de] YYYY') }}
             </div>
         </header>
 
-        <main class="p-6">
+        <main class="p-6 md:p-8 space-y-6">
+            
             @if(session('success'))
-                <div class="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl text-green-800 flex items-center gap-3">
-                    <i class="fas fa-check-circle"></i> {{ session('success') }}
+                <div class="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 flex items-center gap-3 shadow-sm animate-fade-in">
+                    <i class="fas fa-check-circle text-xl"></i> {{ session('success') }}
                 </div>
             @endif
 
-            <div class="mb-6">
-                <h1 class="text-3xl font-bold text-gray-900 mb-2">Olá, {{ explode(' ', $patient->full_name)[0] }}! 👋</h1>
-                <p class="text-gray-600">Bem-vindo ao seu portal de saúde.</p>
-            </div>
-
-            {{-- Modal de Primeiro Acesso - Alterar Senha --}}
-@if($patient->needsPasswordChange())
-<div id="firstAccessModal" class="fixed inset-0 bg-black bg-opacity-60 z-[9999] flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
-        
-        <!-- Header -->
-        <div class="bg-gradient-to-r from-amber-500 to-orange-600 px-6 py-5 text-white">
-            <div class="flex items-center gap-3">
-                <div class="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
-                    <i class="fas fa-key text-2xl"></i>
-                </div>
-                <div>
-                    <h2 class="text-xl font-bold">Bem-vindo(a), {{ explode(' ', $patient->full_name)[0] }}!</h2>
-                    <p class="text-amber-100 text-sm">Primeiro acesso detectado</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Conteúdo -->
-        <div class="p-6">
-            <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
-                <p class="text-sm text-amber-900">
-                    <i class="fas fa-shield-alt text-amber-600 mr-1"></i>
-                    <strong>Por sua segurança</strong>, pedimos que crie uma senha personalizada. 
-                    A senha temporária que recebeu não é segura para uso prolongado.
-                </p>
-            </div>
-
-            <div class="space-y-3">
-                <div class="flex items-start gap-2 text-sm text-gray-700">
-                    <i class="fas fa-check-circle text-green-600 mt-0.5"></i>
-                    <span>Crie uma senha com <strong>mínimo 6 caracteres</strong></span>
-                </div>
-                <div class="flex items-start gap-2 text-sm text-gray-700">
-                    <i class="fas fa-check-circle text-green-600 mt-0.5"></i>
-                    <span>Use letras, números ou símbolos</span>
-                </div>
-                <div class="flex items-start gap-2 text-sm text-gray-700">
-                    <i class="fas fa-check-circle text-green-600 mt-0.5"></i>
-                    <span>Guarde a nova senha em local seguro</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Botões -->
-        <div class="px-6 py-4 bg-gray-50 flex flex-col gap-2">
-            <a href="{{ route('patient.password.change') }}" 
-               class="w-full py-3 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold rounded-xl text-center transition">
-                <i class="fas fa-lock mr-2"></i> CRIAR MINHA SENHA AGORA
-            </a>
-            <form method="POST" action="{{ route('patient.password.postpone') }}">
-                @csrf
-                <button type="submit" 
-                        class="w-full py-2 px-4 text-gray-600 hover:text-gray-800 text-sm font-medium transition">
-                    <i class="fas fa-clock mr-1"></i> Fazer depois (não recomendado)
-                </button>
-            </form>
-        </div>
-    </div>
-</div>
-@endif
-
-            <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-                <div class="bg-white p-5 rounded-xl shadow-sm border">
-                    <div class="flex items-center gap-3">
-                        <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                            <i class="fas fa-calendar text-blue-600 text-xl"></i>
-                        </div>
-                        <div>
-                            <p class="text-xs text-gray-600">Total Consultas</p>
-                            <p class="text-2xl font-bold text-gray-900">{{ $stats['total_consultas'] }}</p>
-                        </div>
+            {{-- 1. BANNER DE BOAS-VINDAS E AÇÃO RÁPIDA --}}
+            <div class="bg-gradient-to-r from-violet-600 to-indigo-700 rounded-2xl p-6 md:p-8 text-white shadow-lg relative overflow-hidden animate-fade-in">
+                <div class="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-16 -mt-16"></div>
+                <div class="absolute bottom-0 left-0 w-48 h-48 bg-white opacity-5 rounded-full -ml-12 -mb-12"></div>
+                
+                <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div>
+                        <h1 class="text-3xl font-black mb-2">Olá, {{ explode(' ', $patient->full_name)[0] }}! 👋</h1>
+                        <p class="text-violet-100 text-lg max-w-xl">
+                            @if($stats['consultas_agendadas'] > 0)
+                                Você tem <strong class="text-white">{{ $stats['consultas_agendadas'] }} consulta(s)</strong> agendada(s). Cuide da sua saúde!
+                            @else
+                                Aproveite o dia! Agende sua próxima consulta para manter o acompanhamento em dia.
+                            @endif
+                        </p>
                     </div>
+                    <a href="{{ route('patient.schedule') }}" class="inline-flex items-center justify-center gap-2 px-6 py-3 bg-white text-violet-700 font-bold rounded-xl shadow-md hover:bg-violet-50 transition transform hover:scale-105">
+                        <i class="fas fa-calendar-plus"></i>
+                        <span>Agendar Nova Consulta</span>
+                    </a>
                 </div>
-                <div class="bg-white p-5 rounded-xl shadow-sm border">
-                    <div class="flex items-center gap-3">
-                        <div class="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center">
+            </div>
+
+            {{-- 2. ESTATÍSTICAS RÁPIDAS --}}
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-fade-in delay-100">
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition group">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center group-hover:bg-blue-100 transition">
+                            <i class="fas fa-calendar-check text-blue-600 text-xl"></i>
+                        </div>
+                        <span class="text-xs font-bold text-slate-400 uppercase">Total</span>
+                    </div>
+                    <p class="text-3xl font-black text-slate-800">{{ $stats['total_consultas'] }}</p>
+                    <p class="text-sm text-slate-500 mt-1">Consultas realizadas</p>
+                </div>
+
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition group">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center group-hover:bg-amber-100 transition">
                             <i class="fas fa-clock text-amber-600 text-xl"></i>
                         </div>
-                        <div>
-                            <p class="text-xs text-amber-600">Agendadas</p>
-                            <p class="text-2xl font-bold text-amber-700">{{ $stats['consultas_agendadas'] }}</p>
-                        </div>
+                        <span class="text-xs font-bold text-amber-600 uppercase">Pendentes</span>
                     </div>
+                    <p class="text-3xl font-black text-slate-800">{{ $stats['consultas_agendadas'] }}</p>
+                    <p class="text-sm text-slate-500 mt-1">Consultas agendadas</p>
                 </div>
-                <div class="bg-white p-5 rounded-xl shadow-sm border">
-                    <div class="flex items-center gap-3">
-                        <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                            <i class="fas fa-check-circle text-green-600 text-xl"></i>
+
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition group">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center group-hover:bg-emerald-100 transition">
+                            <i class="fas fa-check-circle text-emerald-600 text-xl"></i>
                         </div>
-                        <div>
-                            <p class="text-xs text-green-600">Concluídas</p>
-                            <p class="text-2xl font-bold text-green-700">{{ $stats['consultas_concluidas'] }}</p>
-                        </div>
+                        <span class="text-xs font-bold text-emerald-600 uppercase">Concluídas</span>
                     </div>
+                    <p class="text-3xl font-black text-slate-800">{{ $stats['consultas_concluidas'] }}</p>
+                    <p class="text-sm text-slate-500 mt-1">Atendimentos finalizados</p>
                 </div>
-                <div class="bg-white p-5 rounded-xl shadow-sm border">
-                    <div class="flex items-center gap-3">
-                        <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                            <i class="fas fa-file-invoice text-purple-600 text-xl"></i>
+
+                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition group">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="w-12 h-12 bg-violet-50 rounded-xl flex items-center justify-center group-hover:bg-violet-100 transition">
+                            <i class="fas fa-file-invoice text-violet-600 text-xl"></i>
                         </div>
-                        <div>
-                            <p class="text-xs text-purple-600">Cotações</p>
-                            <p class="text-2xl font-bold text-purple-700">{{ $stats['total_cotacoes'] }}</p>
-                        </div>
+                        <span class="text-xs font-bold text-violet-600 uppercase">Financeiro</span>
                     </div>
-                </div>
-                <div class="bg-white p-5 rounded-xl shadow-sm border">
-                    <div class="flex items-center gap-3">
-                        <div class="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
-                            <i class="fas fa-coins text-emerald-600 text-xl"></i>
-                        </div>
-                        <div>
-                            <p class="text-xs text-emerald-600">Total Pago</p>
-                            <p class="text-xl font-bold text-emerald-700">{{ number_format($stats['total_pago'], 0, ',', '.') }} MT</p>
-                        </div>
-                    </div>
+                    <p class="text-2xl font-black text-slate-800">{{ number_format($stats['total_pago'] ?? 0, 0, ',', '.') }} <span class="text-sm font-medium text-slate-500">MT</span></p>
+                    <p class="text-sm text-slate-500 mt-1">Total já pago</p>
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                <div class="bg-white rounded-xl shadow-sm border">
-                    <div class="px-6 py-4 border-b flex items-center justify-between">
-                        <h3 class="font-bold text-gray-900 flex items-center gap-2">
-                            <i class="fas fa-calendar-check text-blue-600"></i> Próximas Consultas
-                        </h3>
-                        <a href="{{ route('patient.consultations') }}" class="text-sm text-blue-600 hover:underline">Ver todas</a>
-                    </div>
-                    <div class="divide-y divide-gray-100">
-                        @forelse($upcomingConsultations as $consultation)
-                            <div class="p-4 hover:bg-gray-50 transition">
-                                <div class="flex items-start gap-4">
-                                    <div class="flex-shrink-0 w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                                        <i class="fas fa-stethoscope text-blue-600"></i>
-                                    </div>
-                                    <div class="flex-1 min-w-0">
-                                        <p class="font-semibold text-gray-900">
-                                            {{ $consultation->scheduled_at->format('d/m/Y \à\s H:i') }}
-                                        </p>
-                                        <p class="text-sm text-gray-600">
-                                            <i class="fas fa-user-md mr-1"></i> {{ $consultation->doctor->name ?? 'Médico' }}
-                                        </p>
-                                        <p class="text-xs text-gray-500 mt-1">
-                                            {{ $consultation->type === 'presencial' ? '🏥 Presencial' : ($consultation->type === 'teleconsulta' ? '💻 Teleconsulta' : '🏠 Domicílio') }}
-                                        </p>
-
-                                        @if($consultation->type === 'teleconsulta')
-                                            <div class="mt-2 flex flex-wrap gap-2">
-                                                @if($consultation->isVideoCallActive())
-                                                    <a href="{{ $consultation->location }}" target="_blank"
-                                                       class="inline-flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg">
-                                                        <i class="fas fa-video"></i> Entrar na Videochamada
-                                                    </a>
-                                                @else
-                                                    <a href="{{ route('patient.consultations.show', $consultation->id) }}"
-                                                       class="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg">
-                                                        <i class="fas fa-hourglass-half"></i> Ver Credenciais
-                                                    </a>
-                                                @endif
-                                            </div>
+            {{-- 3. CONTEÚDO PRINCIPAL (2 Colunas) --}}
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in delay-200">
+                
+                {{-- Coluna Esquerda (Larga): Próximas Consultas e Histórico --}}
+                <div class="lg:col-span-2 space-y-6">
+                    
+                    {{-- Próxima Consulta em Destaque --}}
+                    @if($upcomingConsultations->count() > 0)
+                        @php $nextConsult = $upcomingConsultations->first(); @endphp
+                        <div class="bg-white rounded-2xl shadow-sm border border-violet-100 overflow-hidden">
+                            <div class="bg-violet-50 px-6 py-4 border-b border-violet-100 flex items-center justify-between">
+                                <h3 class="font-bold text-violet-900 flex items-center gap-2">
+                                    <i class="fas fa-star text-violet-600"></i> Próxima Consulta
+                                </h3>
+                                @if($nextConsult->scheduled_at->isToday())
+                                    <span class="px-3 py-1 bg-red-100 text-red-700 text-xs font-bold rounded-full animate-pulse">É HOJE!</span>
+                                @else
+                                    <span class="px-3 py-1 bg-violet-100 text-violet-700 text-xs font-bold rounded-full">Em breve</span>
+                                @endif
+                            </div>
+                            <div class="p-6">
+                                <div class="flex flex-col md:flex-row md:items-center gap-6">
+                                    <div class="flex-shrink-0 w-16 h-16 bg-violet-100 rounded-2xl flex items-center justify-center">
+                                        @if($nextConsult->type === 'teleconsulta')
+                                            <i class="fas fa-video text-violet-600 text-2xl"></i>
+                                        @elseif($nextConsult->type === 'domicilio')
+                                            <i class="fas fa-house-medical text-violet-600 text-2xl"></i>
+                                        @else
+                                            <i class="fas fa-stethoscope text-violet-600 text-2xl"></i>
                                         @endif
                                     </div>
-                                    <span class="px-3 py-1 text-xs font-semibold bg-blue-100 text-blue-800 rounded-full">
-                                        {{ ucfirst($consultation->status) }}
-                                    </span>
+                                    <div class="flex-1">
+                                        <p class="text-2xl font-black text-slate-800 mb-1">
+                                            {{ $nextConsult->scheduled_at->locale('pt_PT')->isoFormat('dddd, DD [de] MMMM [às] HH:mm') }}
+                                        </p>
+                                        <p class="text-slate-600 mb-3">
+                                            <i class="fas fa-user-md text-violet-500 mr-2"></i> {{ $nextConsult->doctor->name ?? 'Médico(a)' }} 
+                                            <span class="mx-2 text-slate-300">|</span>
+                                            {{ ucfirst($nextConsult->type) }}
+                                        </p>
+                                        
+                                        {{-- Botão de Ação Específico --}}
+                                        @if($nextConsult->type === 'teleconsulta' && $nextConsult->location)
+                                            <a href="{{ $nextConsult->location }}" target="_blank" class="inline-flex items-center gap-2 px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition shadow-md">
+                                                <i class="fas fa-video"></i> Entrar na Videochamada
+                                            </a>
+                                        @else
+                                            <a href="{{ route('patient.consultations.show', $nextConsult->id) }}" class="inline-flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white font-bold rounded-lg transition shadow-md">
+                                                <i class="fas fa-eye"></i> Ver Detalhes da Consulta
+                                            </a>
+                                        @endif
+                                    </div>
                                 </div>
                             </div>
-                        @empty
-                            <div class="p-8 text-center text-gray-500">
-                                <i class="fas fa-calendar text-4xl text-gray-300 mb-3"></i>
-                                <p>Nenhuma consulta agendada</p>
-                                <a href="{{ route('patient.schedule') }}" class="inline-block mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
-                                    <i class="fas fa-plus mr-1"></i> Agendar Consulta
-                                </a>
-                            </div>
-                        @endforelse
-                    </div>
-                </div>
+                        </div>
+                    @endif
 
-                <div class="bg-white rounded-xl shadow-sm border">
-                    <div class="px-6 py-4 border-b">
-                        <h3 class="font-bold text-gray-900 flex items-center gap-2">
-                            <i class="fas fa-history text-gray-600"></i> Histórico de Consultas
-                        </h3>
-                    </div>
-                    <div class="divide-y divide-gray-100 max-h-96 overflow-y-auto">
-                        @forelse($pastConsultations as $consultation)
-                            <div class="p-4 hover:bg-gray-50 transition">
-                                <div class="flex items-start gap-4">
-                                    <div class="flex-shrink-0 w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                                        <i class="fas fa-check-circle text-green-600"></i>
+                    {{-- Histórico Recente --}}
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                        <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                            <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                                <i class="fas fa-history text-slate-500"></i> Histórico de Consultas
+                            </h3>
+                            <a href="{{ route('patient.consultations', ['filter' => 'past']) }}" class="text-sm text-violet-600 hover:text-violet-800 font-medium hover:underline">Ver todas</a>
+                        </div>
+                        <div class="divide-y divide-slate-100">
+                            @forelse($pastConsultations->take(5) as $consultation)
+                                <div class="p-4 hover:bg-slate-50 transition flex items-start gap-4">
+                                    <div class="flex-shrink-0 w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center mt-1">
+                                        <i class="fas fa-check-circle text-emerald-600"></i>
                                     </div>
                                     <div class="flex-1 min-w-0">
-                                        <p class="font-semibold text-gray-900 text-sm">
-                                            {{ $consultation->scheduled_at->format('d/m/Y') }}
-                                        </p>
-                                        <p class="text-xs text-gray-600">
-                                            Dr(a). {{ $consultation->doctor->name ?? '-' }}
+                                        <div class="flex items-center justify-between flex-wrap gap-2">
+                                            <p class="font-bold text-slate-800 text-sm">
+                                                {{ $consultation->scheduled_at->locale('pt_PT')->isoFormat('DD [de] MMMM [de] YYYY') }}
+                                            </p>
+                                            <span class="px-2 py-0.5 text-xs font-semibold bg-slate-100 text-slate-600 rounded-full">
+                                                {{ ucfirst($consultation->type) }}
+                                            </span>
+                                        </div>
+                                        <p class="text-xs text-slate-600 mt-1">
+                                            <i class="fas fa-user-md mr-1 text-slate-400"></i> {{ $consultation->doctor->name ?? 'Médico(a)' }}
                                         </p>
                                         @if($consultation->diagnosis)
-                                            <p class="text-xs text-gray-500 mt-1">
-                                                <strong>DX:</strong> {{ Str::limit($consultation->diagnosis, 80) }}
+                                            <p class="text-xs text-slate-500 mt-2 bg-slate-50 p-2 rounded border border-slate-100 line-clamp-2">
+                                                <strong class="text-slate-700">Diagnóstico:</strong> {{ Str::limit($consultation->diagnosis, 80) }}
                                             </p>
                                         @endif
                                     </div>
                                 </div>
-                            </div>
-                        @empty
-                            <div class="p-8 text-center text-gray-500">
-                                <i class="fas fa-history text-4xl text-gray-300 mb-3"></i>
-                                <p>Nenhuma consulta concluída</p>
-                            </div>
-                        @endforelse
-                    </div>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div class="bg-white rounded-xl shadow-sm border">
-                    <div class="px-6 py-4 border-b flex items-center justify-between">
-                        <h3 class="font-bold text-gray-900 flex items-center gap-2">
-                            <i class="fas fa-file-invoice-dollar text-purple-600"></i> Cotações Recentes
-                        </h3>
-                        <a href="{{ route('patient.quotes') }}" class="text-sm text-purple-600 hover:underline">Ver todas</a>
-                    </div>
-                    <div class="divide-y divide-gray-100">
-                        @forelse($recentQuotes as $quote)
-                            <div class="p-4 hover:bg-gray-50 transition">
-                                <div class="flex items-center justify-between">
-                                    <div>
-                                        <p class="font-semibold text-gray-900">Cotação #{{ str_pad($quote->id, 5, '0', STR_PAD_LEFT) }}</p>
-                                        <p class="text-xs text-gray-600">{{ $quote->created_at->format('d/m/Y') }}</p>
-                                    </div>
-                                    <div class="text-right">
-                                        <p class="font-bold text-gray-900">{{ $quote->getFormattedTotal() }}</p>
-                                        <span class="px-2 py-1 text-xs font-semibold rounded-full {{ $quote->getStatusBadgeClass() }}">
-                                            {{ $quote->getStatusLabel() }}
-                                        </span>
-                                    </div>
+                            @empty
+                                <div class="p-10 text-center text-slate-500">
+                                    <i class="fas fa-folder-open text-4xl text-slate-300 mb-3"></i>
+                                    <p class="font-medium">Nenhuma consulta concluída ainda.</p>
+                                    <p class="text-sm mt-1">O seu histórico aparecerá aqui após os atendimentos.</p>
                                 </div>
-                            </div>
-                        @empty
-                            <div class="p-8 text-center text-gray-500">
-                                <i class="fas fa-file-invoice text-4xl text-gray-300 mb-3"></i>
-                                <p>Nenhuma cotação</p>
-                            </div>
-                        @endforelse
+                            @endforelse
+                        </div>
                     </div>
                 </div>
 
-                <div class="bg-white rounded-xl shadow-sm border">
-                    <div class="px-6 py-4 border-b">
-                        <h3 class="font-bold text-gray-900 flex items-center gap-2">
-                            <i class="fas fa-credit-card text-emerald-600"></i> Pagamentos Recentes
+                {{-- Coluna Direita (Estreita): Resumo e Atalhos --}}
+                <div class="space-y-6">
+                    
+                    {{-- Resumo de Saúde Rápido --}}
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+                        <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-heartbeat text-red-500"></i> O Meu Perfil de Saúde
                         </h3>
-                    </div>
-                    <div class="divide-y divide-gray-100">
-                        @forelse($recentPayments as $payment)
-                            <div class="p-4 hover:bg-gray-50 transition">
-                                <div class="flex items-center justify-between">
-                                    <div>
-                                        <p class="font-semibold text-gray-900">{{ number_format($payment->amount, 2, ',', '.') }} MT</p>
-                                        <p class="text-xs text-gray-600">{{ $payment->created_at->format('d/m/Y H:i') }}</p>
-                                    </div>
-                                    @php
-                                        $statusClass = match($payment->status) {
-                                            'confirmado' => 'bg-green-100 text-green-800',
-                                            'pendente' => 'bg-amber-100 text-amber-800',
-                                            'cancelado' => 'bg-red-100 text-red-800',
-                                            default => 'bg-gray-100 text-gray-800',
-                                        };
-                                    @endphp
-                                    <span class="px-2 py-1 text-xs font-semibold rounded-full {{ $statusClass }}">
-                                        {{ ucfirst($payment->status) }}
-                                    </span>
+                        <div class="space-y-4">
+                            <div class="flex items-start gap-3">
+                                <div class="w-8 h-8 bg-red-50 rounded-lg flex items-center justify-center flex-shrink-0">
+                                    <i class="fas fa-exclamation-triangle text-red-500 text-sm"></i>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-bold text-slate-500 uppercase">Alergias / Histórico</p>
+                                    <p class="text-sm text-slate-800 font-medium mt-1">
+                                        {{ Str::limit($patient->medical_history ?: 'Nenhum registo médico adicionado.', 60) }}
+                                    </p>
+                                    <a href="{{ route('patient.profile') }}" class="text-xs text-violet-600 hover:underline mt-1 inline-block">Atualizar informações →</a>
                                 </div>
                             </div>
-                        @empty
-                            <div class="p-8 text-center text-gray-500">
-                                <i class="fas fa-credit-card text-4xl text-gray-300 mb-3"></i>
-                                <p>Nenhum pagamento</p>
+                            
+                            <div class="border-t border-slate-100 pt-4">
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="text-xs font-bold text-slate-500 uppercase">Seguradora Ativa</span>
+                                </div>
+                                @php $activeInsurance = $patient->insurances()->wherePivot('is_active', true)->first(); @endphp
+                                @if($activeInsurance)
+                                    <div class="flex items-center gap-2 bg-blue-50 p-3 rounded-lg border border-blue-100">
+                                        <i class="fas fa-shield-alt text-blue-600"></i>
+                                        <span class="text-sm font-bold text-blue-900">{{ $activeInsurance->name }}</span>
+                                    </div>
+                                @else
+                                    <p class="text-sm text-slate-500 italic">Nenhuma seguradora vinculada.</p>
+                                @endif
                             </div>
-                        @endforelse
+                        </div>
                     </div>
+
+                    {{-- Ações Rápidas --}}
+                    <div class="bg-gradient-to-br from-indigo-600 to-violet-700 rounded-2xl shadow-lg p-6 text-white">
+                        <h3 class="font-bold mb-4 flex items-center gap-2">
+                            <i class="fas fa-bolt text-yellow-300"></i> Ações Rápidas
+                        </h3>
+                        <div class="space-y-3">
+                            <a href="{{ route('patient.quotes') }}" class="flex items-center gap-3 p-3 bg-white/10 hover:bg-white/20 rounded-xl transition group">
+                                <div class="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center group-hover:scale-110 transition">
+                                    <i class="fas fa-file-invoice-dollar"></i>
+                                </div>
+                                <div>
+                                    <p class="font-bold text-sm">Ver Cotações</p>
+                                    <p class="text-xs text-indigo-200">{{ $stats['total_cotacoes'] ?? 0 }} registos</p>
+                                </div>
+                            </a>
+                            
+                            <a href="{{ route('patient.payments') }}" class="flex items-center gap-3 p-3 bg-white/10 hover:bg-white/20 rounded-xl transition group">
+                                <div class="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center group-hover:scale-110 transition">
+                                    <i class="fas fa-credit-card"></i>
+                                </div>
+                                <div>
+                                    <p class="font-bold text-sm">Meus Pagamentos</p>
+                                    <p class="text-xs text-indigo-200">Histórico financeiro</p>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+
+                    {{-- Dica de Saúde --}}
+                    <div class="bg-emerald-50 border border-emerald-100 rounded-2xl p-5">
+                        <div class="flex items-start gap-3">
+                            <i class="fas fa-lightbulb text-emerald-600 text-xl mt-1"></i>
+                            <div>
+                                <p class="font-bold text-emerald-900 text-sm mb-1">Dica de Saúde do Dia</p>
+                                <p class="text-sm text-emerald-800 leading-relaxed">
+                                    Beba pelo menos 2 litros de água por dia e tente fazer 30 minutos de atividade física leve. A sua saúde agradece! 💧
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         </main>
@@ -429,101 +336,5 @@
             document.getElementById('sidebar-overlay').classList.toggle('hidden');
         }
     </script>
-
-{{-- Área de Impressão (invisível na tela, visível na impressão) --}}
-<div id="credentialsPrintArea" class="hidden">
-    <div style="font-family: 'Lato', Arial, sans-serif; color: #1f2937; max-width: 180mm; margin: 0 auto;">
-        
-        <!-- Cabeçalho -->
-        <div style="border-bottom: 3px solid #10b981; padding-bottom: 10px; margin-bottom: 15px;">
-            <table style="width: 100%; border-collapse: collapse;">
-                <tr>
-                    <td style="width: 60px; vertical-align: middle;">
-                        @if(file_exists(public_path('images/logo_makombe.jpg')))
-                            <img src="{{ public_path('images/logo_makombe.jpg') }}" style="width: 50px; height: 50px; object-fit: contain;">
-                        @else
-                            <div style="width: 50px; height: 50px; background: #10b981; border-radius: 8px; color: white; text-align: center; line-height: 50px; font-size: 24px; font-weight: bold;">M</div>
-                        @endif
-                    </td>
-                    <td style="vertical-align: middle;">
-                        <h1 style="margin: 0; font-size: 20px; color: #10b981; font-weight: 900;">MAKOMBE</h1>
-                        <p style="margin: 0; font-size: 10px; color: #6b7280; font-style: italic;">Consultório Médico • "Aqui você tem saúde"</p>
-                        <p style="margin: 0; font-size: 9px; color: #9ca3af;">Maputo, Moçambique • +258 84 123 4567</p>
-                    </td>
-                    <td style="text-align: right; vertical-align: middle;">
-                        <p style="margin: 0; font-size: 9px; color: #6b7280;">Emitido em:</p>
-                        <p style="margin: 0; font-size: 10px; font-weight: bold; color: #1f2937;">{{ now()->format('d/m/Y H:i') }}</p>
-                    </td>
-                </tr>
-            </table>
-        </div>
-
-        <!-- Título -->
-        <div style="text-align: center; margin-bottom: 15px;">
-            <h2 style="margin: 0; font-size: 16px; color: #1f2937; font-weight: bold;">CREDENCIAIS DE ACESSO AO PORTAL</h2>
-            <p style="margin: 3px 0 0 0; font-size: 10px; color: #6b7280;">Guarde este documento em local seguro</p>
-        </div>
-
-        <!-- Dados do Paciente -->
-        <div style="background: #f3f4f6; border-left: 4px solid #10b981; padding: 8px 12px; margin-bottom: 12px; border-radius: 4px;">
-            <table style="width: 100%; font-size: 10px;">
-                <tr>
-                    <td style="width: 30%; color: #6b7280; font-weight: 600;">Paciente:</td>
-                    <td style="color: #1f2937; font-weight: bold;">{{ $patient->full_name }}</td>
-                </tr>
-                <tr>
-                    <td style="color: #6b7280; font-weight: 600;">NID:</td>
-                    <td style="color: #1f2937; font-family: monospace; font-weight: bold;">{{ $patient->nid }}</td>
-                </tr>
-            </table>
-        </div>
-
-        <!-- Credenciais -->
-        <div style="border: 2px solid #10b981; border-radius: 6px; padding: 10px; margin-bottom: 12px;">
-            <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
-                <tr style="border-bottom: 1px solid #e5e7eb;">
-                    <td style="padding: 6px 8px; color: #6b7280; font-weight: 600; width: 35%;">Email de Login:</td>
-                    <td style="padding: 6px 8px; color: #1f2937; font-family: monospace; font-weight: bold;">{{ $patient->email }}</td>
-                </tr>
-                <tr style="border-bottom: 1px solid #e5e7eb;">
-                    <td style="padding: 6px 8px; color: #6b7280; font-weight: 600;">Telefone:</td>
-                    <td style="padding: 6px 8px; color: #1f2937; font-family: monospace; font-weight: bold;">+258 {{ $patient->phone }}</td>
-                </tr>
-                <tr>
-                    <td style="padding: 6px 8px; color: #dc2626; font-weight: 700;">Senha:</td>
-                    <td style="padding: 6px 8px; color: #dc2626; font-family: monospace; font-weight: 900; font-size: 14px;">{{ $temporaryPassword ?? '********' }}</td>
-                </tr>
-            </table>
-        </div>
-
-        <!-- Link de Acesso -->
-        <div style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 8px 12px; border-radius: 4px; margin-bottom: 12px; text-align: center;">
-            <p style="margin: 0; font-size: 9px; color: #1e40af; font-weight: 600;">ENDEREÇO DE ACESSO:</p>
-            <p style="margin: 3px 0 0 0; font-size: 11px; color: #1e40af; font-family: monospace; font-weight: bold;">
-                {{ route('patient.login') }}
-            </p>
-        </div>
-
-        <!-- Aviso de Segurança -->
-        <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 8px 12px; border-radius: 4px; margin-bottom: 10px;">
-            <p style="margin: 0 0 4px 0; font-size: 10px; color: #92400e; font-weight: 700;">
-                ⚠️ INFORMAÇÕES IMPORTANTES:
-            </p>
-            <ul style="margin: 0; padding-left: 15px; font-size: 9px; color: #78350f; line-height: 1.4;">
-                <li>Guarde este documento em local seguro e confidencial.</li>
-                <li>Não partilhe suas credenciais com terceiros.</li>
-                <li>Após o primeiro login, crie uma senha personalizada.</li>
-                <li>Em caso de perda, use "Esqueci minha senha" no portal.</li>
-            </ul>
-        </div>
-
-        <!-- Rodapé -->
-        <div style="border-top: 2px solid #e5e7eb; padding-top: 8px; text-align: center; font-size: 8px; color: #9ca3af;">
-            <p style="margin: 0;">Makombe Consultório Médico • Lei 19/2022 - Proteção de Dados Pessoais</p>
-            <p style="margin: 2px 0 0 0;">info@makombe.co.mz • www.makombe.co.mz</p>
-        </div>
-    </div>
-</div>
-
 </body>
 </html>

@@ -1,301 +1,665 @@
-<x-layouts.admin title="Relatórios Gerenciais">
+<x-layouts.admin title="Relatórios Gerenciais Avançados">
 
-    <!-- Header -->
-    <div class="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-            <h1 class="text-3xl font-bold text-gray-900 mb-2">📊 Relatórios Gerenciais</h1>
-            <p class="text-gray-600">Análise detalhada do desempenho do consultório</p>
-        </div>
+    {{-- CSS AVANÇADO PARA IMPRESSÃO E GRÁFICOS --}}
+    <style>
+        .tab-btn { transition: all 0.3s; }
+        .tab-btn.active { background-color: #059669; color: white; }
+        .period-btn { transition: all 0.2s; }
+        .period-btn.active { background-color: #059669; color: white; border-color: #059669; }
         
-        <!-- Seletor de Período -->
-        <div class="flex flex-wrap gap-2">
-            <a href="{{ route('reports.index', ['period' => 'today']) }}" 
-               class="px-4 py-2 rounded-lg text-sm font-medium transition {{ $period === 'today' ? 'bg-blue-600 text-white' : 'bg-white border text-gray-700 hover:bg-gray-50' }}">
-                Hoje
-            </a>
-            <a href="{{ route('reports.index', ['period' => 'week']) }}" 
-               class="px-4 py-2 rounded-lg text-sm font-medium transition {{ $period === 'week' ? 'bg-blue-600 text-white' : 'bg-white border text-gray-700 hover:bg-gray-50' }}">
-                Semana
-            </a>
-            <a href="{{ route('reports.index', ['period' => 'month']) }}" 
-               class="px-4 py-2 rounded-lg text-sm font-medium transition {{ $period === 'month' ? 'bg-blue-600 text-white' : 'bg-white border text-gray-700 hover:bg-gray-50' }}">
-                Mês
-            </a>
-            <a href="{{ route('reports.index', ['period' => 'year']) }}" 
-               class="px-4 py-2 rounded-lg text-sm font-medium transition {{ $period === 'year' ? 'bg-blue-600 text-white' : 'bg-white border text-gray-700 hover:bg-gray-50' }}">
-                Ano
-            </a>
-        </div>
-    </div>
+        @media print {
+            body * { visibility: hidden; }
+            #printableArea, #printableArea * { visibility: visible; }
+            #printableArea {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                margin: 0;
+                padding: 15px;
+                background: white;
+            }
+            .no-print, button, nav, aside, header, footer, .sidebar, .fixed, input, select {
+                display: none !important;
+            }
+            table { width: 100%; border-collapse: collapse; font-size: 11px; }
+            th, td { border: 1px solid #000; padding: 5px; text-align: left; }
+            th { background-color: #f3f4f6 !important; -webkit-print-color-adjust: exact; font-weight: bold; }
+            .print-header {
+                display: flex !important;
+                justify-content: space-between;
+                align-items: center;
+                border-bottom: 3px solid #000;
+                padding-bottom: 15px;
+                margin-bottom: 20px;
+                visibility: visible !important;
+            }
+            .page-break { page-break-before: always; }
+        }
+        .print-header { display: none; }
+    </style>
 
-    <!-- Cards Principais -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div class="bg-gradient-to-br from-blue-500 to-indigo-600 p-6 rounded-xl shadow-lg text-white relative overflow-hidden">
-            <i class="fas fa-users text-5xl opacity-20 absolute top-2 right-2"></i>
-            <p class="text-sm opacity-90">Total de Pacientes</p>
-            <p class="text-4xl font-bold mt-2">{{ number_format($totalPatients) }}</p>
-        </div>
-        <div class="bg-gradient-to-br from-green-500 to-emerald-600 p-6 rounded-xl shadow-lg text-white relative overflow-hidden">
-            <i class="fas fa-calendar-check text-5xl opacity-20 absolute top-2 right-2"></i>
-            <p class="text-sm opacity-90">Total de Consultas</p>
-            <p class="text-4xl font-bold mt-2">{{ number_format($totalConsultations) }}</p>
-        </div>
-        <div class="bg-gradient-to-br from-purple-500 to-pink-600 p-6 rounded-xl shadow-lg text-white relative overflow-hidden">
-            <i class="fas fa-coins text-5xl opacity-20 absolute top-2 right-2"></i>
-            <p class="text-sm opacity-90">Receita Total</p>
-            <p class="text-3xl font-bold mt-2">{{ number_format($totalRevenue, 0, ',', '.') }}</p>
-            <p class="text-xs opacity-75">MT</p>
-        </div>
-        <div class="bg-gradient-to-br from-amber-500 to-orange-600 p-6 rounded-xl shadow-lg text-white relative overflow-hidden">
-            <i class="fas fa-chart-line text-5xl opacity-20 absolute top-2 right-2"></i>
-            <p class="text-sm opacity-90">Receita do Mês</p>
-            <p class="text-3xl font-bold mt-2">{{ number_format($monthRevenue, 0, ',', '.') }}</p>
-            <p class="text-xs opacity-75">MT</p>
-        </div>
-    </div>
-
-    <!-- Gráficos Principais -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <!-- Receita Mensal -->
-        <div class="bg-white rounded-xl shadow-sm border p-6">
-            <h3 class="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <i class="fas fa-chart-line text-blue-600"></i> Receita Mensal (últimos 6 meses)
-            </h3>
-            <canvas id="revenueChart" height="200"></canvas>
-        </div>
-
-        <!-- Consultas por Tipo -->
-        <div class="bg-white rounded-xl shadow-sm border p-6">
-            <h3 class="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <i class="fas fa-chart-pie text-purple-600"></i> Consultas por Tipo
-            </h3>
-            <canvas id="typeChart" height="200"></canvas>
-        </div>
-    </div>
-
-    <!-- Segunda Linha de Gráficos -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <!-- Receita Diária -->
-        <div class="bg-white rounded-xl shadow-sm border p-6">
-            <h3 class="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <i class="fas fa-chart-bar text-green-600"></i> Receita dos Últimos 7 Dias
-            </h3>
-            <canvas id="dailyChart" height="200"></canvas>
-        </div>
-
-        <!-- Pacientes Novos -->
-        <div class="bg-white rounded-xl shadow-sm border p-6">
-            <h3 class="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <i class="fas fa-user-plus text-amber-600"></i> Pacientes Novos por Mês
-            </h3>
-            <canvas id="patientsChart" height="200"></canvas>
-        </div>
-    </div>
-
-    <!-- Consultas por Dia da Semana -->
-    <div class="bg-white rounded-xl shadow-sm border p-6 mb-6">
-        <h3 class="font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <i class="fas fa-calendar-week text-indigo-600"></i> Consultas por Dia da Semana
-        </h3>
-        <canvas id="weekdayChart" height="100"></canvas>
-    </div>
-
-    <!-- Top Médicos e Seguradoras -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <!-- Top Médicos -->
-        <div class="bg-white rounded-xl shadow-sm border p-6">
-            <h3 class="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <i class="fas fa-user-md text-blue-600"></i> Top 5 Médicos
-            </h3>
-            <div class="space-y-3">
-                @forelse($topDoctors as $index => $item)
-                    <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
-                        <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0">
-                            {{ $index + 1 }}
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <p class="font-semibold text-gray-900 truncate">{{ $item->doctor->name ?? 'N/A' }}</p>
-                            <p class="text-xs text-gray-500">{{ $item->count }} consultas realizadas</p>
-                        </div>
-                        <div class="text-right">
-                            <span class="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">
-                                {{ $item->count }}
-                            </span>
-                        </div>
-                    </div>
-                @empty
-                    <div class="text-center py-8 text-gray-500">
-                        <i class="fas fa-user-md text-4xl text-gray-300 mb-2"></i>
-                        <p>Sem dados de consultas</p>
-                    </div>
-                @endforelse
+    <div id="printableArea">
+        
+        {{-- CABEÇALHO PARA IMPRESSÃO --}}
+        <div class="print-header">
+            <div>
+                <h1 style="font-size: 28px; margin: 0; color: #000;">MAKOMBE CONSULTÓRIO MÉDICO</h1>
+                <p style="margin: 5px 0 0 0; color: #333;">Relatório Gerencial - {{ ucfirst(str_replace('_', ' ', $reportType)) }}</p>
+                <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">Período: {{ $label }} | Gerado em: {{ now()->format('d/m/Y H:i') }}</p>
+            </div>
+            <div style="text-align: right;">
+                @if(file_exists(public_path('images/logo-mcm.png')))
+                    <img src="{{ public_path('images/logo-mcm.png') }}" alt="Logo" style="height: 70px;">
+                @endif
             </div>
         </div>
 
-        <!-- Top Seguradoras -->
-        <div class="bg-white rounded-xl shadow-sm border p-6">
-            <h3 class="font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <i class="fas fa-shield-alt text-purple-600"></i> Top 5 Seguradoras
-            </h3>
-            <div class="space-y-3">
-                @forelse($topInsurances as $index => $item)
-                    <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
-                        <div class="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-600 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0">
-                            {{ $index + 1 }}
-                        </div>
-                        <div class="flex-1 min-w-0">
-                            <p class="font-semibold text-gray-900 truncate">{{ $item->insurance->name ?? 'N/A' }}</p>
-                            <p class="text-xs text-gray-500">{{ $item->count }} consultas cobertas</p>
-                        </div>
-                        <div class="text-right">
-                            <span class="inline-block px-2 py-1 bg-purple-100 text-purple-800 text-xs font-semibold rounded-full">
-                                {{ $item->count }}
-                            </span>
-                        </div>
-                    </div>
-                @empty
-                    <div class="text-center py-8 text-gray-500">
-                        <i class="fas fa-shield-alt text-4xl text-gray-300 mb-2"></i>
-                        <p>Sem dados de seguradoras</p>
-                    </div>
-                @endforelse
+        {{-- CONTEÚDO PRINCIPAL --}}
+        <div class="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 no-print">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900 mb-2"> Relatórios Gerenciais</h1>
+                <p class="text-gray-600">Período: <span class="font-semibold text-emerald-700">{{ $label }}</span></p>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="window.print()" class="px-6 py-3 bg-gray-800 hover:bg-gray-900 text-white font-bold rounded-xl shadow-lg transition flex items-center gap-2">
+                    <i class="fas fa-file-pdf"></i> Exportar PDF
+                </button>
             </div>
         </div>
-    </div>
 
-    <!-- Status das Consultas -->
-    <div class="bg-white rounded-xl shadow-sm border p-6 mb-6">
-        <h3 class="font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <i class="fas fa-tasks text-blue-600"></i> Distribuição por Status
-        </h3>
-        <div class="grid grid-cols-2 md:grid-cols-6 gap-4">
-            @php
-                $statusLabels = [
-                    'agendada' => ['label' => 'Agendadas', 'color' => 'blue', 'icon' => 'calendar'],
-                    'confirmada' => ['label' => 'Confirmadas', 'color' => 'indigo', 'icon' => 'check-double'],
-                    'em_andamento' => ['label' => 'Em Andamento', 'color' => 'amber', 'icon' => 'spinner'],
-                    'concluida' => ['label' => 'Concluídas', 'color' => 'green', 'icon' => 'check-circle'],
-                    'cancelada' => ['label' => 'Canceladas', 'color' => 'red', 'icon' => 'times-circle'],
-                    'faltou' => ['label' => 'Faltou', 'color' => 'gray', 'icon' => 'user-slash'],
-                ];
-            @endphp
-            @foreach($statusLabels as $status => $info)
-                <div class="p-4 bg-{{ $info['color'] }}-50 border border-{{ $info['color'] }}-200 rounded-xl text-center">
-                    <i class="fas fa-{{ $info['icon'] }} text-{{ $info['color'] }}-600 text-2xl mb-2"></i>
-                    <p class="text-xs text-{{ $info['color'] }}-700 uppercase font-semibold">{{ $info['label'] }}</p>
-                    <p class="text-2xl font-bold text-{{ $info['color'] }}-900 mt-1">
-                        {{ $consultationsByStatus[$status] ?? 0 }}
-                    </p>
+        {{-- SELETOR DE TIPO DE RELATÓRIO --}}
+        <div class="bg-white rounded-xl shadow-sm border p-4 mb-6 no-print">
+            <div class="flex flex-wrap gap-2 mb-4">
+                <a href="{{ route('reports.index', array_merge(request()->except('type'), ['type' => 'dashboard'])) }}" 
+                   class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold {{ $reportType === 'dashboard' ? 'active bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
+                    📈 Dashboard
+                </a>
+                <a href="{{ route('reports.index', array_merge(request()->except('type'), ['type' => 'consultations'])) }}" 
+                   class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold {{ $reportType === 'consultations' ? 'active bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
+                    🏥 Consultas
+                </a>
+                <a href="{{ route('reports.index', array_merge(request()->except('type'), ['type' => 'patients'])) }}" 
+                   class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold {{ $reportType === 'patients' ? 'active bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
+                     Pacientes
+                </a>
+                <a href="{{ route('reports.index', array_merge(request()->except('type'), ['type' => 'payments'])) }}" 
+                   class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold {{ $reportType === 'payments' ? 'active bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
+                    💰 Pagamentos
+                </a>
+                <a href="{{ route('reports.index', array_merge(request()->except('type'), ['type' => 'financial'])) }}" 
+                   class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold {{ $reportType === 'financial' ? 'active bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
+                    📊 Financeiro
+                </a>
+                <a href="{{ route('reports.index', array_merge(request()->except('type'), ['type' => 'users'])) }}" 
+                   class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold {{ $reportType === 'users' ? 'active bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
+                    👨‍⚕️ Utilizadores
+                </a>
+                <a href="{{ route('reports.index', array_merge(request()->except('type'), ['type' => 'quotes'])) }}" 
+                   class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold {{ $reportType === 'quotes' ? 'active bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200' }}">
+                    📋 Cotações
+                </a>
+            </div>
+
+            {{-- FILTROS DE PERÍODO --}}
+            <form method="GET" action="{{ route('reports.index') }}" class="flex flex-wrap gap-2 items-end">
+                <input type="hidden" name="type" value="{{ $reportType }}">
+                
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Período Rápido</label>
+                    <select name="period" onchange="this.form.submit()" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                        <option value="today" {{ $period === 'today' ? 'selected' : '' }}>Hoje</option>
+                        <option value="yesterday" {{ $period === 'yesterday' ? 'selected' : '' }}>Ontem</option>
+                        <option value="week" {{ $period === 'week' ? 'selected' : '' }}>Esta Semana</option>
+                        <option value="last_week" {{ $period === 'last_week' ? 'selected' : '' }}>Semana Passada</option>
+                        <option value="month" {{ $period === 'month' ? 'selected' : '' }}>Este Mês</option>
+                        <option value="last_month" {{ $period === 'last_month' ? 'selected' : '' }}>Mês Passado</option>
+                        <option value="year" {{ $period === 'year' ? 'selected' : '' }}>Este Ano</option>
+                        <option value="last_year" {{ $period === 'last_year' ? 'selected' : '' }}>Ano Passado</option>
+                    </select>
                 </div>
-            @endforeach
-        </div>
-    </div>
 
-    <!-- Scripts dos Gráficos -->
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Data Inicial</label>
+                    <input type="date" name="start_date" value="{{ $startDate ?? '' }}" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Data Final</label>
+                    <input type="date" name="end_date" value="{{ $endDate ?? '' }}" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                </div>
+
+                <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg text-sm">
+                    <i class="fas fa-filter mr-1"></i> Filtrar
+                </button>
+
+                <a href="{{ route('reports.index', ['type' => $reportType]) }}" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg text-sm">
+                    <i class="fas fa-redo mr-1"></i> Limpar
+                </a>
+            </form>
+        </div>
+
+        {{-- CARDS DE ESTATÍSTICAS --}}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-l-4 border-l-emerald-500">
+                <p class="text-xs text-gray-500 uppercase font-semibold">Receita Total (Geral)</p>
+                <p class="text-2xl font-bold text-gray-900 mt-1">{{ number_format($stats['total_revenue'], 2, ',', '.') }} MT</p>
+                <p class="text-xs text-emerald-600 mt-1">Período: {{ number_format($stats['period_revenue'], 2, ',', '.') }} MT</p>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-l-4 border-l-blue-500">
+                <p class="text-xs text-gray-500 uppercase font-semibold">Total de Consultas</p>
+                <p class="text-2xl font-bold text-gray-900 mt-1">{{ $stats['total_consultations'] }}</p>
+                <p class="text-xs text-blue-600 mt-1">Período: {{ $stats['period_consultations'] }}</p>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-l-4 border-l-purple-500">
+                <p class="text-xs text-gray-500 uppercase font-semibold">Total de Pacientes</p>
+                <p class="text-2xl font-bold text-gray-900 mt-1">{{ $stats['total_patients'] }}</p>
+                <p class="text-xs text-purple-600 mt-1">Novos no período: {{ $stats['period_new_patients'] }}</p>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-l-4 border-l-amber-500">
+                <p class="text-xs text-gray-500 uppercase font-semibold">Pagamentos Pendentes</p>
+                <p class="text-2xl font-bold text-gray-900 mt-1">{{ number_format($stats['pending_payments'], 2, ',', '.') }} MT</p>
+                <p class="text-xs text-amber-600 mt-1">Período: {{ number_format($stats['period_pending'], 2, ',', '.') }} MT</p>
+            </div>
+        </div>
+
+        {{-- CONTEÚDO ESPECÍFICO POR TIPO DE RELATÓRIO --}}
+        
+        @if($reportType === 'dashboard')
+            {{-- GRÁFICOS --}}
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <div class="bg-white rounded-xl shadow-sm border p-6">
+                    <h3 class="font-bold text-gray-900 mb-4">📈 Receita Diária (Últimos 7 Dias)</h3>
+                    <canvas id="revenueChart" height="200"></canvas>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border p-6">
+                    <h3 class="font-bold text-gray-900 mb-4">🏥 Consultas Diárias (Últimos 7 Dias)</h3>
+                    <canvas id="consultationsChart" height="200"></canvas>
+                </div>
+            </div>
+
+            {{-- TOP MÉDICOS --}}
+            <div class="bg-white rounded-xl shadow-sm border overflow-hidden mb-6">
+                <div class="px-6 py-4 border-b bg-gray-50">
+                    <h3 class="font-bold text-gray-900">👨‍️ Top 5 Médicos (Consultas no Período)</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-50 border-b">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">#</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Médico</th>
+                                <th class="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Total Consultas</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            @forelse($data['topDoctors'] ?? [] as $index => $item)
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-6 py-3 text-sm font-bold text-gray-900">{{ $index + 1 }}</td>
+                                    <td class="px-6 py-3 text-sm">{{ $item->doctor->name ?? 'N/A' }}</td>
+                                    <td class="px-6 py-3 text-center">
+                                        <span class="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded-full">{{ $item->count }}</span>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="3" class="px-6 py-8 text-center text-gray-500">Nenhum dado disponível</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {{-- CONSULTAS RECENTES --}}
+            <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+                <div class="px-6 py-4 border-b bg-gray-50">
+                    <h3 class="font-bold text-gray-900"> Consultas Recentes</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-50 border-b">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Data/Hora</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Paciente</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Médico</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Tipo</th>
+                                <th class="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            @forelse($data['recentConsultations'] ?? [] as $consult)
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-6 py-3 text-sm">{{ $consult->scheduled_at->format('d/m/Y H:i') }}</td>
+                                    <td class="px-6 py-3 text-sm font-medium">{{ $consult->patient->full_name ?? 'N/A' }}</td>
+                                    <td class="px-6 py-3 text-sm">{{ $consult->doctor->name ?? 'N/A' }}</td>
+                                    <td class="px-6 py-3 text-sm capitalize">{{ $consult->type }}</td>
+                                    <td class="px-6 py-3 text-center">
+                                        <span class="px-2 py-1 text-xs font-semibold rounded-full 
+                                            {{ $consult->status === 'concluida' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800' }}">
+                                            {{ ucfirst(str_replace('_', ' ', $consult->status)) }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="5" class="px-6 py-8 text-center text-gray-500">Nenhuma consulta</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        @elseif($reportType === 'consultations')
+            {{-- RELATÓRIO DE CONSULTAS --}}
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <div class="bg-white rounded-xl shadow-sm border p-6">
+                    <h3 class="font-bold text-gray-900 mb-4">Consultas por Tipo</h3>
+                    <canvas id="consultTypeChart" height="200"></canvas>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border p-6">
+                    <h3 class="font-bold text-gray-900 mb-4">Consultas por Status</h3>
+                    <canvas id="consultStatusChart" height="200"></canvas>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border overflow-hidden mb-6 page-break">
+                <div class="px-6 py-4 border-b bg-gray-50">
+                    <h3 class="font-bold text-gray-900">📋 Todas as Consultas do Período</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-50 border-b">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Data/Hora</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Paciente</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Médico</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Tipo</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Seguradora</th>
+                                <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Valor</th>
+                                <th class="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            @forelse($data['consultations'] ?? [] as $consult)
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-6 py-3 text-sm">{{ $consult->scheduled_at->format('d/m/Y H:i') }}</td>
+                                    <td class="px-6 py-3 text-sm font-medium">{{ $consult->patient->full_name ?? 'N/A' }}</td>
+                                    <td class="px-6 py-3 text-sm">{{ $consult->doctor->name ?? 'N/A' }}</td>
+                                    <td class="px-6 py-3 text-sm capitalize">{{ $consult->type }}</td>
+                                    <td class="px-6 py-3 text-sm">{{ $consult->insurance->name ?? 'Particular' }}</td>
+                                    <td class="px-6 py-3 text-sm text-right font-bold">{{ number_format($consult->total_amount, 2, ',', '.') }} MT</td>
+                                    <td class="px-6 py-3 text-center">
+                                        <span class="px-2 py-1 text-xs font-semibold rounded-full 
+                                            {{ $consult->status === 'concluida' ? 'bg-green-100 text-green-800' : ($consult->status === 'cancelada' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800') }}">
+                                            {{ ucfirst(str_replace('_', ' ', $consult->status)) }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="7" class="px-6 py-8 text-center text-gray-500">Nenhuma consulta</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        @elseif($reportType === 'patients')
+            {{-- RELATÓRIO DE PACIENTES --}}
+            <div class="bg-white rounded-xl shadow-sm border p-6 mb-6">
+                <h3 class="font-bold text-gray-900 mb-4">Pacientes por Género</h3>
+                <canvas id="patientsGenderChart" height="200"></canvas>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border overflow-hidden mb-6 page-break">
+                <div class="px-6 py-4 border-b bg-gray-50">
+                    <h3 class="font-bold text-gray-900">👥 Todos os Pacientes do Período</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-50 border-b">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">NID</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Nome Completo</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Telefone</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Email</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Género</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Data Registo</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            @forelse($data['patients'] ?? [] as $patient)
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-6 py-3 text-sm font-mono">{{ $patient->nid }}</td>
+                                    <td class="px-6 py-3 text-sm font-medium">{{ $patient->full_name }}</td>
+                                    <td class="px-6 py-3 text-sm">+258 {{ $patient->phone }}</td>
+                                    <td class="px-6 py-3 text-sm">{{ $patient->email }}</td>
+                                    <td class="px-6 py-3 text-sm capitalize">{{ $patient->gender }}</td>
+                                    <td class="px-6 py-3 text-sm">{{ $patient->created_at->format('d/m/Y') }}</td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="6" class="px-6 py-8 text-center text-gray-500">Nenhum paciente</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+                <div class="px-6 py-4 border-b bg-gray-50">
+                    <h3 class="font-bold text-gray-900">🏆 Top 10 Pacientes (Mais Consultas)</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-50 border-b">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">#</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Paciente</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Telefone</th>
+                                <th class="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Total Consultas</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            @forelse($data['topPatients'] ?? [] as $index => $patient)
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-6 py-3 text-sm font-bold text-gray-900">{{ $index + 1 }}</td>
+                                    <td class="px-6 py-3 text-sm font-medium">{{ $patient->full_name }}</td>
+                                    <td class="px-6 py-3 text-sm">+258 {{ $patient->phone }}</td>
+                                    <td class="px-6 py-3 text-center">
+                                        <span class="px-3 py-1 bg-purple-100 text-purple-800 text-xs font-bold rounded-full">{{ $patient->consultations_count }}</span>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="4" class="px-6 py-8 text-center text-gray-500">Nenhum dado</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        @elseif($reportType === 'payments')
+            {{-- RELATÓRIO DE PAGAMENTOS --}}
+            <div class="bg-white rounded-xl shadow-sm border p-6 mb-6">
+                <h3 class="font-bold text-gray-900 mb-4">Pagamentos por Método</h3>
+                <canvas id="paymentMethodChart" height="200"></canvas>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+                <div class="px-6 py-4 border-b bg-gray-50">
+                    <h3 class="font-bold text-gray-900">💳 Todos os Pagamentos do Período</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-50 border-b">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Data</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Paciente</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Médico</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Método</th>
+                                <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Valor</th>
+                                <th class="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            @forelse($data['payments'] ?? [] as $payment)
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-6 py-3 text-sm">{{ $payment->created_at->format('d/m/Y H:i') }}</td>
+                                    <td class="px-6 py-3 text-sm font-medium">{{ $payment->patient->full_name ?? 'N/A' }}</td>
+                                    <td class="px-6 py-3 text-sm">{{ $payment->consultation?->doctor?->name ?? '-' }}</td>
+                                    <td class="px-6 py-3 text-sm capitalize">{{ $payment->method }}</td>
+                                    <td class="px-6 py-3 text-sm text-right font-bold">{{ number_format($payment->amount, 2, ',', '.') }} MT</td>
+                                    <td class="px-6 py-3 text-center">
+                                        <span class="px-2 py-1 text-xs font-semibold rounded-full 
+                                            {{ $payment->status === 'confirmado' ? 'bg-green-100 text-green-800' : ($payment->status === 'cancelado' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800') }}">
+                                            {{ ucfirst($payment->status) }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="6" class="px-6 py-8 text-center text-gray-500">Nenhum pagamento</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        @elseif($reportType === 'financial')
+            {{-- RELATÓRIO FINANCEIRO --}}
+            <div class="bg-white rounded-xl shadow-sm border p-6 mb-6">
+                <h3 class="font-bold text-gray-900 mb-4">Receita Diária</h3>
+                <canvas id="dailyRevenueChart" height="200"></canvas>
+            </div>
+
+            @if(isset($data['insuranceRevenue']) && $data['insuranceRevenue']->count() > 0)
+            <div class="bg-white rounded-xl shadow-sm border overflow-hidden mb-6 page-break">
+                <div class="px-6 py-4 border-b bg-gray-50">
+                    <h3 class="font-bold text-gray-900"> Receita por Seguradora</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-50 border-b">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Seguradora</th>
+                                <th class="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Total Consultas</th>
+                                <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Valor Total</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            @foreach($data['insuranceRevenue'] as $item)
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-6 py-3 text-sm font-medium">{{ $item->insurance->name ?? 'N/A' }}</td>
+                                    <td class="px-6 py-3 text-center">{{ $item->count }}</td>
+                                    <td class="px-6 py-3 text-sm text-right font-bold">{{ number_format($item->total, 2, ',', '.') }} MT</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            @endif
+
+        @elseif($reportType === 'users')
+            {{-- RELATÓRIO DE UTILIZADORES --}}
+            <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+                <div class="px-6 py-4 border-b bg-gray-50">
+                    <h3 class="font-bold text-gray-900">👨‍️ Todos os Utilizadores do Sistema</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-50 border-b">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Nome</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Email</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Função</th>
+                                <th class="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Consultas</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Data Registo</th>
+                                <th class="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            @forelse($data['users'] ?? [] as $user)
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-6 py-3 text-sm font-medium">{{ $user->name }}</td>
+                                    <td class="px-6 py-3 text-sm">{{ $user->email }}</td>
+                                    <td class="px-6 py-3 text-sm">
+                                        @foreach($user->getRoleNames() as $role)
+                                            <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded-full">{{ $role }}</span>
+                                        @endforeach
+                                    </td>
+                                    <td class="px-6 py-3 text-center">{{ $user->consultations_count ?? 0 }}</td>
+                                    <td class="px-6 py-3 text-sm">{{ $user->created_at->format('d/m/Y') }}</td>
+                                    <td class="px-6 py-3 text-center">
+                                        <span class="px-2 py-1 text-xs font-semibold rounded-full {{ $user->is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
+                                            {{ $user->is_active ? 'Ativo' : 'Inativo' }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="6" class="px-6 py-8 text-center text-gray-500">Nenhum utilizador</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        @elseif($reportType === 'quotes')
+            {{-- RELATÓRIO DE COTAÇÕES --}}
+            <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+                <div class="px-6 py-4 border-b bg-gray-50">
+                    <h3 class="font-bold text-gray-900"> Todas as Cotações do Período</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-50 border-b">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Nº</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Paciente</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Data</th>
+                                <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Itens</th>
+                                <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Total</th>
+                                <th class="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            @forelse($data['quotes'] ?? [] as $quote)
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-6 py-3 text-sm font-mono">#{{ str_pad($quote->id, 5, '0', STR_PAD_LEFT) }}</td>
+                                    <td class="px-6 py-3 text-sm font-medium">{{ $quote->patient->full_name ?? 'N/A' }}</td>
+                                    <td class="px-6 py-3 text-sm">{{ $quote->created_at->format('d/m/Y') }}</td>
+                                    <td class="px-6 py-3 text-sm">{{ $quote->items->count() }}</td>
+                                    <td class="px-6 py-3 text-sm text-right font-bold">{{ number_format($quote->final_amount, 2, ',', '.') }} MT</td>
+                                    <td class="px-6 py-3 text-center">
+                                        <span class="px-2 py-1 text-xs font-semibold rounded-full 
+                                            {{ $quote->status === 'aprovada' ? 'bg-green-100 text-green-800' : ($quote->status === 'recusada' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800') }}">
+                                            {{ ucfirst($quote->status) }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="6" class="px-6 py-8 text-center text-gray-500">Nenhuma cotação</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        @endif
+
+    </div> {{-- Fim do printableArea --}}
+
+        {{-- SCRIPTS PARA GRÁFICOS (CORRIGIDOS) --}}
+    @if($reportType === 'dashboard' || $reportType === 'consultations' || $reportType === 'patients' || $reportType === 'payments' || $reportType === 'financial')
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
-        // Receita Mensal
-        new Chart(document.getElementById('revenueChart'), {
-            type: 'line',
-            data: {
-                labels: @json($monthlyLabels),
-                datasets: [{
-                    label: 'Receita (MT)',
-                    data: @json($monthlyRevenue),
-                    borderColor: '#10b981',
-                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                    borderWidth: 3,
-                    fill: true,
-                    tension: 0.4
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: { legend: { display: false } },
-                scales: { y: { beginAtZero: true, ticks: { callback: v => v + ' MT' } } }
-            }
-        });
+        // Gráficos do Dashboard
+        @if($reportType === 'dashboard')
+            new Chart(document.getElementById('revenueChart'), {
+                type: 'bar',
+                data: {
+                    labels: @json($data['dailyLabels'] ?? []),
+                    datasets: [{
+                        label: 'Receita (MT)',
+                        data: @json($data['dailyRevenue'] ?? []),
+                        backgroundColor: 'rgba(16, 185, 129, 0.7)',
+                        borderColor: '#059669',
+                        borderWidth: 1,
+                        borderRadius: 6
+                    }]
+                },
+                options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+            });
 
-        // Consultas por Tipo
-        new Chart(document.getElementById('typeChart'), {
-            type: 'doughnut',
-            data: {
-                labels: ['Presencial', 'Teleconsulta', 'Domicílio'],
-                datasets: [{
-                    data: [
-                        {{ $consultationsByType['presencial'] ?? 0 }},
-                        {{ $consultationsByType['teleconsulta'] ?? 0 }},
-                        {{ $consultationsByType['domicilio'] ?? 0 }}
-                    ],
-                    backgroundColor: ['#3b82f6', '#8b5cf6', '#f59e0b'],
-                    borderWidth: 0
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: { legend: { position: 'bottom' } }
-            }
-        });
+            new Chart(document.getElementById('consultationsChart'), {
+                type: 'line',
+                data: {
+                    labels: @json($data['dailyLabels'] ?? []),
+                    datasets: [{
+                        label: 'Consultas',
+                        data: @json($data['dailyConsultations'] ?? []),
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+            });
+        @endif
 
-        // Receita Diária
-        new Chart(document.getElementById('dailyChart'), {
-            type: 'bar',
-            data: {
-                labels: @json($dailyLabels),
-                datasets: [{
-                    label: 'Receita (MT)',
-                    data: @json($dailyRevenue),
-                    backgroundColor: '#10b981',
-                    borderRadius: 6
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: { legend: { display: false } },
-                scales: { y: { beginAtZero: true, ticks: { callback: v => v + ' MT' } } }
-            }
-        });
+        // Gráficos de Consultas
+        @if($reportType === 'consultations')
+            new Chart(document.getElementById('consultTypeChart'), {
+                type: 'doughnut',
+                data: {
+                    labels: @json($data['consultTypeLabels'] ?? []),
+                    datasets: [{
+                        data: @json($data['consultTypeData'] ?? []),
+                        backgroundColor: ['#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444']
+                    }]
+                },
+                options: { responsive: true }
+            });
 
-        // Pacientes Novos
-        new Chart(document.getElementById('patientsChart'), {
-            type: 'line',
-            data: {
-                labels: @json($newPatientsLabels),
-                datasets: [{
-                    label: 'Novos Pacientes',
-                    data: @json($newPatientsByMonth),
-                    borderColor: '#f59e0b',
-                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
-                    borderWidth: 3,
-                    fill: true,
-                    tension: 0.4
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: { legend: { display: false } },
-                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
-            }
-        });
+            new Chart(document.getElementById('consultStatusChart'), {
+                type: 'pie',
+                data: {
+                    labels: @json($data['consultStatusLabels'] ?? []),
+                    datasets: [{
+                        data: @json($data['consultStatusData'] ?? []),
+                        backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#6b7280']
+                    }]
+                },
+                options: { responsive: true }
+            });
+        @endif
 
-        // Consultas por Dia da Semana
-        new Chart(document.getElementById('weekdayChart'), {
-            type: 'bar',
-            data: {
-                labels: @json($weekdayLabels),
-                datasets: [{
-                    label: 'Consultas',
-                    data: @json($consultationsByWeekday),
-                    backgroundColor: '#6366f1',
-                    borderRadius: 6
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: { legend: { display: false } },
-                scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
-            }
-        });
+        // Gráfico de Pacientes por Género
+        @if($reportType === 'patients')
+            new Chart(document.getElementById('patientsGenderChart'), {
+                type: 'bar',
+                data: {
+                    labels: @json($data['patientsGenderLabels'] ?? []),
+                    datasets: [{
+                        label: 'Total',
+                        data: @json($data['patientsGenderData'] ?? []),
+                        backgroundColor: ['#ec4899', '#3b82f6', '#6b7280']
+                    }]
+                },
+                options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+            });
+        @endif
+
+        // Gráfico de Pagamentos por Método
+        @if($reportType === 'payments')
+            new Chart(document.getElementById('paymentMethodChart'), {
+                type: 'bar',
+                data: {
+                    labels: @json($data['paymentMethodLabels'] ?? []),
+                    datasets: [{
+                        label: 'Total (MT)',
+                        data: @json($data['paymentMethodData'] ?? []),
+                        backgroundColor: '#10b981'
+                    }]
+                },
+                options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+            });
+        @endif
+
+        // Gráfico de Receita Diária (Financeiro)
+        @if($reportType === 'financial')
+            new Chart(document.getElementById('dailyRevenueChart'), {
+                type: 'line',
+                data: {
+                    labels: @json($data['dailyRevenueLabels'] ?? []),
+                    datasets: [{
+                        label: 'Receita (MT)',
+                        data: @json($data['dailyRevenueData'] ?? []),
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: { responsive: true, scales: { y: { beginAtZero: true } } }
+            });
+        @endif
     </script>
+    @endif
 
 </x-layouts.admin>

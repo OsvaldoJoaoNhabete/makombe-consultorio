@@ -165,7 +165,7 @@ class PatientPortalController extends Controller
         ));
     }
 
-    /**
+        /**
      * Processar agendamento
      */
     public function schedule(Request $request)
@@ -173,8 +173,7 @@ class PatientPortalController extends Controller
         $patient = Auth::guard('patient')->user();
 
         $validated = $request->validate([
-            'doctor_id' => 'required|exists:users,id',
-            'date' => 'required|date|after:today',
+            'date' => 'required|date|after_or_equal:today', // Permite a partir de hoje
             'time' => 'required',
             'type' => 'required|in:presencial,teleconsulta,domicilio',
             'insurance_id' => 'nullable|exists:insurances,id',
@@ -186,24 +185,18 @@ class PatientPortalController extends Controller
         $hour = (int) explode(':', $validated['time'])[0];
         if ($hour < 7 || $hour >= 19) {
             return back()
-                ->withErrors(['time' => 'O horário deve ser entre 07:00 e 19:00.'])
+                ->withErrors(['time' => 'O horário de atendimento é das 07:00 às 19:00.'])
                 ->withInput();
         }
 
-        $conflict = Consultation::where('doctor_id', $validated['doctor_id'])
-            ->where('scheduled_at', $scheduledAt)
-            ->where('status', '!=', 'cancelada')
-            ->exists();
-
-        if ($conflict) {
-            return back()
-                ->withErrors(['time' => 'Este horário já está ocupado. Escolha outro.'])
-                ->withInput();
-        }
+        // Como o paciente não escolhe o médico, buscamos um médico ativo padrão ou deixamos nulo
+        // (A receção poderá alterar isso no painel admin antes de confirmar)
+        $defaultDoctor = \App\Models\User::role('Medico')->where('is_active', true)->first();
+        $doctorId = $defaultDoctor ? $defaultDoctor->id : null;
 
         $consultation = Consultation::create([
             'patient_id' => $patient->id,
-            'doctor_id' => $validated['doctor_id'],
+            'doctor_id' => $doctorId, // Será atribuído ou ajustado pela admin
             'scheduled_at' => $scheduledAt,
             'type' => $validated['type'],
             'insurance_id' => $validated['insurance_id'] ?? null,
@@ -214,19 +207,13 @@ class PatientPortalController extends Controller
         if ($consultation->type === 'teleconsulta') {
             $roomName = 'makombe-consulta-' . $consultation->id . '-' . uniqid();
             $consultation->update(['location' => 'https://meet.jit.si/' . $roomName]);
-
-            try {
-                $this->whatsappService->sendConsultationMessage($consultation);
-            } catch (\Exception $e) {
-                \Log::warning('Erro ao enviar WhatsApp: ' . $e->getMessage());
-            }
         }
 
         try {
-            PatientActivityLog::log(
+            \App\Models\PatientActivityLog::log(
                 $patient->id,
                 'agendar_consulta',
-                "Paciente agendou consulta para " . Carbon::parse($scheduledAt)->format('d/m/Y \à\s H:i'),
+                "Paciente agendou consulta para " . \Carbon\Carbon::parse($scheduledAt)->format('d/m/Y \à\s H:i'),
                 ['consultation_id' => $consultation->id]
             );
         } catch (\Exception $e) {
@@ -235,7 +222,7 @@ class PatientPortalController extends Controller
 
         return redirect()
             ->route('patient.consultations')
-            ->with('success', '✅ Consulta agendada com sucesso! Data: ' . Carbon::parse($scheduledAt)->format('d/m/Y \à\s H:i'));
+            ->with('success', '✅ Solicitação de agendamento enviada com sucesso! A nossa equipe confirmará o médico em breve.');
     }
 
     /**

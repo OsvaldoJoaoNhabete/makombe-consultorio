@@ -10,58 +10,47 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
-        body { font-family: 'Lato', sans-serif; }
-        .sidebar { position: fixed; top: 0; left: 0; height: 100vh; width: 260px; background: white; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; z-index: 50; }
-        .nav-item { display: flex; align-items: center; padding: 0.75rem 1.5rem; color: #4b5563; text-decoration: none; transition: all 0.2s; font-size: 0.95rem; font-weight: 500; border-left: 4px solid transparent; }
-        .nav-item:hover { background-color: #f9fafb; color: #10b981; }
-        .nav-item.active { background-color: #ecfdf5; color: #10b981; border-left-color: #10b981; }
-        .main-content { margin-left: 260px; min-height: 100vh; background-color: #f9fafb; }
-        @media (max-width: 768px) { .sidebar { transform: translateX(-100%); } .sidebar.open { transform: translateX(0); } .main-content { margin-left: 0; } }
-    </style>
+    body { font-family: 'Lato', sans-serif; }
+    
+    .sidebar { 
+        position: fixed; top: 0; left: 0; height: 100vh; width: 270px; 
+        background: linear-gradient(180deg, #4c1d95 0%, #5b21b6 50%, #6d28d9 100%); 
+        display: flex; flex-direction: column; z-index: 50; 
+        transition: transform 0.3s ease;
+    }
+    
+    .nav-item { 
+        display: flex; align-items: center; padding: 0.85rem 1.5rem; 
+        color: #ddd6fe; text-decoration: none; transition: all 0.2s ease; 
+        font-size: 0.95rem; font-weight: 500; border-left: 4px solid transparent; 
+    }
+    .nav-item:hover { 
+        background-color: rgba(255, 255, 255, 0.1); 
+        color: #ffffff; 
+        border-left-color: #a78bfa;
+    }
+    .nav-item.active { 
+        background-color: rgba(255, 255, 255, 0.15); 
+        color: #ffffff; 
+        border-left-color: #ffffff;
+        font-weight: 700;
+    }
+    .nav-item i { width: 24px; text-align: center; margin-right: 12px; font-size: 1.1rem; }
+    
+    .main-content { margin-left: 270px; min-height: 100vh; background-color: #f8fafc; }
+    
+    @media (max-width: 768px) { 
+        .sidebar { transform: translateX(-100%); } 
+        .sidebar.open { transform: translateX(0); } 
+        .main-content { margin-left: 0; } 
+    }
+</style>
 </head>
 <body class="bg-gray-50">
 
     <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden md:hidden" onclick="toggleSidebar()"></div>
 
-    <aside class="sidebar" id="sidebar">
-        <div class="p-6 border-b border-gray-200">
-            <div class="flex items-center gap-3">
-                <div class="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center shadow-lg">
-                    <i class="fas fa-heartbeat text-white text-xl"></i>
-                </div>
-                <div>
-                    <h1 class="text-lg font-bold text-gray-800">MAKOMBE</h1>
-                    <p class="text-xs text-gray-500 italic">Portal do Paciente</p>
-                </div>
-            </div>
-        </div>
-
-        <nav class="flex-1 overflow-y-auto py-4 space-y-1">
-            <a href="{{ route('patient.dashboard') }}" class="nav-item"><i class="fas fa-home w-6"></i> Dashboard</a>
-            <a href="{{ route('patient.schedule') }}" class="nav-item"><i class="fas fa-calendar-plus w-6"></i> Agendar Consulta</a>
-            <a href="{{ route('patient.consultations') }}" class="nav-item"><i class="fas fa-calendar-check w-6"></i> Minhas Consultas</a>
-            <a href="{{ route('patient.quotes') }}" class="nav-item"><i class="fas fa-file-invoice-dollar w-6"></i> Cotações</a>
-            <a href="{{ route('patient.payments') }}" class="nav-item"><i class="fas fa-credit-card w-6"></i> Pagamentos</a>
-            <a href="{{ route('patient.insurances') }}" class="nav-item active"><i class="fas fa-shield-alt w-6"></i> Seguradoras</a>
-            <a href="{{ route('patient.profile') }}" class="nav-item"><i class="fas fa-user w-6"></i> Meu Perfil</a>
-        </nav>
-
-        <div class="p-4 border-t border-gray-200">
-            <div class="flex items-center gap-3">
-                <div class="h-10 w-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold">
-                    {{ strtoupper(substr($patient->full_name, 0, 1)) }}
-                </div>
-                <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium text-gray-900 truncate">{{ $patient->full_name }}</p>
-                    <p class="text-xs text-gray-500 truncate">{{ $patient->email }}</p>
-                </div>
-                <form method="POST" action="{{ route('patient.logout') }}" class="inline">
-                    @csrf
-                    <button type="submit" class="text-gray-400 hover:text-red-600 transition"><i class="fas fa-sign-out-alt"></i></button>
-                </form>
-            </div>
-        </div>
-    </aside>
+    <x-portal-sidebar />
 
     <div class="main-content">
         <header class="bg-white border-b border-gray-200 px-6 py-4">

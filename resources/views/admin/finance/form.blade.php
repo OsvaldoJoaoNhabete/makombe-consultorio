@@ -6,16 +6,16 @@
         </a>
     </div>
 
-    <div class="max-w-3xl mx-auto">
-        <div class="bg-white rounded-xl shadow-sm border p-6">
+    <div class="max-w-4xl mx-auto">
+        <div class="bg-white rounded-xl shadow-sm border p-6 lg:p-8">
             
-            <div class="mb-6 pb-6 border-b">
-                <h1 class="text-2xl font-bold text-gray-900 mb-2">💳 Novo Pagamento</h1>
-                <p class="text-gray-600">Registe um novo pagamento recebido.</p>
+            <div class="mb-6 pb-6 border-b border-gray-200">
+                <h1 class="text-2xl font-bold text-gray-900 mb-2">💳 Registar Novo Pagamento</h1>
+                <p class="text-gray-600">Preencha os dados abaixo. Se vincular a uma consulta, o valor será preenchido automaticamente.</p>
             </div>
 
             @if($errors->any())
-                <div class="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl">
+                <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
                     <ul class="text-sm text-red-800 space-y-1">
                         @foreach($errors->all() as $error)
                             <li><i class="fas fa-exclamation-circle mr-1"></i>{{ $error }}</li>
@@ -32,8 +32,8 @@
                     <label class="block text-sm font-semibold text-gray-700 mb-2">
                         <i class="fas fa-user text-blue-600 mr-1"></i> Paciente <span class="text-red-500">*</span>
                     </label>
-                    <select name="patient_id" required
-                            class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <select name="patient_id" id="patientSelect" required
+                            class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
                         <option value="">Selecione um paciente...</option>
                         @foreach($patients as $p)
                             <option value="{{ $p->id }}" {{ old('patient_id') == $p->id ? 'selected' : '' }}>
@@ -43,53 +43,64 @@
                     </select>
                 </div>
 
-                <!-- Consulta Vinculada (opcional) -->
-                <div>
-                    <label class="block text-sm font-semibold text-gray-700 mb-2">
-                        <i class="fas fa-calendar-check text-blue-600 mr-1"></i> Consulta Vinculada (opcional)
+                <!-- Vincular à Consulta (NOVO) -->
+                <div class="bg-blue-50 border border-blue-200 rounded-xl p-5">
+                    <label class="block text-sm font-semibold text-blue-900 mb-2">
+                        <i class="fas fa-link text-blue-600 mr-1"></i> Vincular à Consulta (Opcional)
                     </label>
-                    <select name="consultation_id"
-                            class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="">Nenhuma (pagamento avulso)</option>
-                        @foreach($consultations as $c)
-                            <option value="{{ $c->id }}" {{ old('consultation_id') == $c->id ? 'selected' : '' }}>
-                                {{ $c->scheduled_at->format('d/m/Y H:i') }} - {{ $c->patient->full_name }} - {{ number_format($c->total_amount, 2, ',', '.') }} MT
+                    <select name="consultation_id" id="consultationSelect"
+                            class="w-full px-4 py-3 border border-blue-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                        <option value="">-- Pagamento Avulso (Não vincular a nenhuma consulta) --</option>
+                        @forelse($pendingConsultations as $consult)
+                            @php
+                                // Calcula o valor pendente (prioriza patient_amount se existir, senão total_amount)
+                                $dueAmount = ($consult->patient_amount > 0) ? $consult->patient_amount : $consult->total_amount;
+                            @endphp
+                            <option value="{{ $consult->id }}" 
+                                    data-amount="{{ $dueAmount }}"
+                                    data-patient="{{ $consult->patient_id }}">
+                                📅 {{ $consult->scheduled_at->format('d/m/Y H:i') }} | 👨‍⚕️ {{ $consult->doctor->name ?? 'Médico' }} | 👤 {{ $consult->patient->full_name }} | 💰 Pendente: {{ number_format($dueAmount, 2, ',', '.') }} MT
                             </option>
-                        @endforeach
+                        @empty
+                            <option disabled>Nenhuma consulta pendente de pagamento no sistema.</option>
+                        @endforelse
                     </select>
+                    <p class="text-xs text-blue-700 mt-2">
+                        <i class="fas fa-info-circle mr-1"></i> Ao selecionar uma consulta, o campo "Valor" será preenchido automaticamente com o valor pendente.
+                    </p>
                 </div>
 
                 <!-- Valor e Método -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-2">
                             <i class="fas fa-coins text-green-600 mr-1"></i> Valor (MT) <span class="text-red-500">*</span>
                         </label>
-                        <input type="number" name="amount" step="0.01" min="0.01" required
+                        <input type="number" name="amount" id="amountInput" step="0.01" min="0.01" required
                                value="{{ old('amount') }}"
-                               class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                               class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold text-lg"
                                placeholder="0.00">
                     </div>
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-2">
-                            <i class="fas fa-credit-card text-blue-600 mr-1"></i> Método <span class="text-red-500">*</span>
+                            <i class="fas fa-credit-card text-purple-600 mr-1"></i> Método de Pagamento <span class="text-red-500">*</span>
                         </label>
                         <select name="method" required
-                                class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="">Selecione...</option>
+                                class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                            <option value="">Selecione o método...</option>
                             <option value="mpesa" {{ old('method') === 'mpesa' ? 'selected' : '' }}>📱 M-Pesa</option>
                             <option value="emola" {{ old('method') === 'emola' ? 'selected' : '' }}>📱 e-Mola</option>
-                            <option value="transferencia" {{ old('method') === 'transferencia' ? 'selected' : '' }}> Transferência Bancária</option>
-                            <option value="numerario" {{ old('method') === 'numerario' ? 'selected' : '' }}> Numerário</option>
-                            <option value="cheque" {{ old('method') === 'cheque' ? 'selected' : '' }}> Cheque</option>
-                            <option value="cartao" {{ old('method') === 'cartao' ? 'selected' : '' }}> Cartão</option>
-                            <option value="seguradora" {{ old('method') === 'seguradora' ? 'selected' : '' }}>️ Seguradora</option>
+                            <option value="transferencia" {{ old('method') === 'transferencia' ? 'selected' : '' }}>🏦 Transferência Bancária</option>
+                            <option value="numerario" {{ old('method') === 'numerario' ? 'selected' : '' }}>💵 Numerário</option>
+                            <option value="cheque" {{ old('method') === 'cheque' ? 'selected' : '' }}>📄 Cheque</option>
+                            <option value="cartao" {{ old('method') === 'cartao' ? 'selected' : '' }}>💳 Cartão</option>
+                            <option value="seguradora" {{ old('method') === 'seguradora' ? 'selected' : '' }}>🛡️ Seguradora</option>
                         </select>
                     </div>
                 </div>
 
-                <!-- Referência e Descrição -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Referência e Data -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-2">
                             <i class="fas fa-hashtag text-gray-600 mr-1"></i> Referência / Nº Transação
@@ -107,20 +118,21 @@
                     </div>
                 </div>
 
+                <!-- Descrição -->
                 <div>
                     <label class="block text-sm font-semibold text-gray-700 mb-2">
-                        <i class="fas fa-sticky-note text-amber-600 mr-1"></i> Descrição (opcional)
+                        <i class="fas fa-sticky-note text-amber-600 mr-1"></i> Descrição / Observações
                     </label>
                     <textarea name="description" rows="3" 
                               class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                              placeholder="Observações sobre o pagamento...">{{ old('description') }}</textarea>
+                              placeholder="Ex: Pagamento referente à consulta de cardiologia...">{{ old('description') }}</textarea>
                 </div>
 
                 <!-- Botões -->
-                <div class="flex flex-col sm:flex-row gap-3 pt-6 border-t">
+                <div class="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200">
                     <button type="submit" 
-                            class="flex-1 py-3 px-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl transition flex items-center justify-center gap-2">
-                        <i class="fas fa-check-circle"></i> Registar Pagamento
+                            class="flex-1 py-3 px-4 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl transition flex items-center justify-center gap-2 shadow-md">
+                        <i class="fas fa-check-circle"></i> Confirmar e Registar Pagamento
                     </button>
                     <a href="{{ route('financeiro.payments.index') }}" 
                        class="flex-1 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition flex items-center justify-center gap-2">
@@ -130,5 +142,41 @@
             </form>
         </div>
     </div>
+
+    <!-- Script para Preenchimento Automático -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const consultationSelect = document.getElementById('consultationSelect');
+            const amountInput = document.getElementById('amountInput');
+            const patientSelect = document.getElementById('patientSelect');
+
+            consultationSelect.addEventListener('change', function() {
+                const selectedOption = this.options[this.selectedIndex];
+                
+                if (selectedOption.value) {
+                    const amount = selectedOption.getAttribute('data-amount');
+                    const patientId = selectedOption.getAttribute('data-patient');
+
+                    // 1. Preencher o valor automaticamente
+                    if (amount && amount > 0) {
+                        amountInput.value = amount;
+                        // Efeito visual para mostrar que foi preenchido
+                        amountInput.classList.add('bg-green-50', 'border-green-300');
+                        setTimeout(() => {
+                            amountInput.classList.remove('bg-green-50', 'border-green-300');
+                        }, 1500);
+                    }
+
+                    // 2. Preencher o paciente automaticamente (se ainda não estiver selecionado)
+                    if (patientId && (!patientSelect.value || patientSelect.value === "")) {
+                        patientSelect.value = patientId;
+                    }
+                } else {
+                    // Se desmarcar, limpar o valor (opcional, pode remover se quiser manter)
+                    // amountInput.value = '';
+                }
+            });
+        });
+    </script>
 
 </x-layouts.admin>

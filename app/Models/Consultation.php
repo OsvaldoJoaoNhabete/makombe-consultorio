@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Consultation extends Model
@@ -36,13 +37,17 @@ class Consultation extends Model
 
     protected $casts = [
         'scheduled_at' => 'datetime',
-        'total_amount' => 'decimal:2',
-        'insurance_coverage' => 'decimal:2',
-        'patient_amount' => 'decimal:2',
         'video_call_started_at' => 'datetime',
         'video_call_ended_at' => 'datetime',
         'patient_notified_at' => 'datetime',
+        'total_amount' => 'decimal:2',
+        'insurance_coverage' => 'decimal:2',
+        'patient_amount' => 'decimal:2',
     ];
+
+    // ============================================
+    // RELACIONAMENTOS
+    // ============================================
 
     public function patient(): BelongsTo
     {
@@ -64,33 +69,78 @@ class Consultation extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    public function isVideoCallActive(): bool
+    public function payments(): HasMany
     {
-        return $this->type === 'teleconsulta'
-            && $this->video_call_started_at !== null
-            && $this->video_call_ended_at === null;
+        return $this->hasMany(Payment::class);
     }
 
-    public function getJitsiRoomId(): string
+    // ============================================
+    // MÉTODOS AUXILIARES
+    // ============================================
+
+    /**
+     * Obter classe CSS do status para badges
+     */
+    public function getStatusBadgeClass(): string
+    {
+        return match($this->status) {
+            'agendada' => 'bg-blue-100 text-blue-800',
+            'confirmada' => 'bg-indigo-100 text-indigo-800',
+            'em_andamento' => 'bg-amber-100 text-amber-800',
+            'concluida' => 'bg-green-100 text-green-800',
+            'cancelada' => 'bg-red-100 text-red-800',
+            'faltou' => 'bg-gray-100 text-gray-800',
+            default => 'bg-gray-100 text-gray-800',
+        };
+    }
+
+    /**
+     * Obter label formatada do status
+     */
+    public function getStatusLabel(): string
+    {
+        return ucfirst(str_replace('_', ' ', $this->status));
+    }
+
+    /**
+     * Verificar se a videochamada está ativa (começou e não terminou)
+     */
+    public function isVideoCallActive(): bool
+    {
+        return $this->type === 'teleconsulta' && 
+               $this->video_call_started_at !== null && 
+               $this->video_call_ended_at === null;
+    }
+
+    /**
+     * Obter ID da sala Jitsi a partir do location
+     */
+    public function getJitsiRoomId(): ?string
     {
         if ($this->location && str_starts_with($this->location, 'https://meet.jit.si/')) {
             return str_replace('https://meet.jit.si/', '', $this->location);
         }
-        return '';
+        return null;
     }
 
+    /**
+     * Iniciar videochamada
+     */
     public function startVideoCall(): void
     {
         $this->update([
             'video_call_started_at' => now(),
-            'status' => 'em_andamento',
+            'status' => 'em_andamento'
         ]);
     }
 
+    /**
+     * Terminar videochamada
+     */
     public function endVideoCall(): void
     {
         $this->update([
-            'video_call_ended_at' => now(),
+            'video_call_ended_at' => now()
         ]);
     }
 }

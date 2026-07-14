@@ -1,47 +1,122 @@
-<x-guest-layout>
-    <!-- Session Status -->
-    <x-auth-session-status class="mb-4" :status="session('status')" />
+<!DOCTYPE html>
+<html lang="pt-MZ">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>Login Staff • Makombe Consultório Médico</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body { font-family: 'Lato', sans-serif; }
+        .bg-violet-gradient { background: linear-gradient(135deg, #4c1d95 0%, #5b21b6 50%, #6d28d9 100%); }
+    </style>
+</head>
+<body class="bg-violet-gradient min-h-screen flex items-center justify-center p-4">
 
-    <form method="POST" action="{{ route('login') }}">
-        @csrf
+    <div class="w-full max-w-md">
+        <div class="bg-white rounded-3xl shadow-2xl overflow-hidden">
+            
+            <!-- Header com Logótipo -->
+            <div class="bg-violet-gradient px-8 py-10 text-center">
+                <div class="w-24 h-24 bg-white rounded-2xl flex items-center justify-center shadow-xl mx-auto mb-4 p-2">
+                    @if(file_exists(public_path('images/logo-mcm.png')))
+                        <img src="{{ asset('images/logo-mcm.png') }}" alt="Makombe" class="w-full h-full object-contain">
+                    @else
+                        <i class="fas fa-heartbeat text-4xl text-violet-700"></i>
+                    @endif
+                </div>
+                <h1 class="text-3xl font-black text-white mb-1">MAKOMBE</h1>
+                <p class="text-violet-200 text-sm">Painel Administrativo</p>
+                <p class="text-violet-300 text-xs italic mt-1">"Aqui você tem saúde"</p>
+            </div>
 
-        <!-- Email Address -->
-        <div>
-            <x-input-label for="email" :value="__('Email')" />
-            <x-text-input id="email" class="block mt-1 w-full" type="email" name="email" :value="old('email')" required autofocus autocomplete="username" />
-            <x-input-error :messages="$errors->get('email')" class="mt-2" />
-        </div>
-
-        <!-- Password -->
-        <div class="mt-4">
-            <x-input-label for="password" :value="__('Password')" />
-
-            <x-text-input id="password" class="block mt-1 w-full"
-                            type="password"
-                            name="password"
-                            required autocomplete="current-password" />
-
-            <x-input-error :messages="$errors->get('password')" class="mt-2" />
-        </div>
-
-        <!-- Remember Me -->
-        <div class="block mt-4">
-            <label for="remember_me" class="inline-flex items-center">
-                <input id="remember_me" type="checkbox" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" name="remember">
-                <span class="ms-2 text-sm text-gray-600">{{ __('Remember me') }}</span>
-            </label>
-        </div>
-
-        <div class="flex items-center justify-end mt-4">
-            @if (Route::has('password.request'))
-                <a class="underline text-sm text-gray-600 hover:text-gray-900 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" href="{{ route('password.request') }}">
-                    {{ __('Forgot your password?') }}
+            <!-- Form -->
+            <div class="p-8">
+                <!-- Botão Voltar à Página Inicial -->
+                <a href="{{ route('welcome') }}" class="inline-flex items-center gap-2 text-sm font-semibold text-violet-600 hover:text-violet-800 transition group mb-6">
+                    <i class="fas fa-arrow-left group-hover:-translate-x-1 transition-transform"></i> 
+                    Voltar à Página Inicial
                 </a>
-            @endif
 
-            <x-primary-button class="ms-3">
-                {{ __('Log in') }}
-            </x-primary-button>
+                <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">Bem-vindo, Staff! 👋</h2>
+
+                @if($errors->any())
+                    <div class="mb-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-800 text-sm">
+                        <i class="fas fa-exclamation-circle mr-1"></i> {{ $errors->first() }}
+                    </div>
+                @endif
+
+                <form method="POST" action="{{ route('staff.login') }}" class="space-y-5">
+                    @csrf
+                    
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            <i class="fas fa-envelope text-violet-600 mr-2"></i>Email
+                        </label>
+                        <input type="email" name="email" value="{{ old('email') }}" required autofocus
+                               class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500"
+                               placeholder="admin@makombe.co.mz">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">
+                            <i class="fas fa-lock text-violet-600 mr-2"></i>Senha
+                        </label>
+                        <div class="relative">
+                            <input type="password" name="password" id="staffPassword" required
+                                   class="w-full px-4 py-3 pr-12 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                   placeholder="••••••••">
+                            <button type="button" onclick="togglePassword('staffPassword', 'staffEyeIcon')" 
+                                    class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-violet-600 transition">
+                                <i id="staffEyeIcon" class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between text-sm">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" name="remember" class="w-4 h-4 text-violet-600 rounded focus:ring-violet-500">
+                            <span class="text-gray-600">Lembrar-me</span>
+                        </label>
+                    </div>
+
+                    <button type="submit" 
+                            class="w-full py-3 px-4 bg-violet-600 hover:bg-violet-700 text-white font-bold rounded-xl shadow-lg transition">
+                        <i class="fas fa-sign-in-alt mr-2"></i>ENTRAR
+                    </button>
+                </form>
+
+                <div class="mt-6 text-center">
+                    <a href="{{ route('patient.login') }}" class="text-sm text-violet-600 hover:text-violet-800 font-medium">
+                        <i class="fas fa-user mr-1"></i> Ir para Portal do Paciente
+                    </a>
+                </div>
+            </div>
         </div>
-    </form>
-</x-guest-layout>
+
+        <div class="text-center mt-6 text-xs text-white/80">
+            <p>© {{ date('Y') }} Makombe Consultório Médico</p>
+        </div>
+    </div>
+
+    <script>
+        function togglePassword(inputId, iconId) {
+            const input = document.getElementById(inputId);
+            const icon = document.getElementById(iconId);
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('fa-eye');
+                icon.classList.add('fa-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('fa-eye-slash');
+                icon.classList.add('fa-eye');
+            }
+        }
+    </script>
+</body>
+</html>
