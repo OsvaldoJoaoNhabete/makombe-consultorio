@@ -14,16 +14,23 @@ class Patient extends Authenticatable
 {
     use HasFactory, SoftDeletes, Notifiable;
 
-    protected $fillable = [
+        protected $fillable = [
         'full_name',
         'nid',
         'bi_number',
         'birth_date',
         'gender',
+        'blood_type', // ← ADICIONADO
         'phone',
         'email',
         'address',
         'medical_history',
+        'emergency_contact_name', // ← ADICIONADO
+        'emergency_contact_phone', // ← ADICIONADO
+        'emergency_contact_relation', // ← ADICIONADO
+        'insurance_id', // ← ADICIONADO (Para seguro principal)
+        'policy_number', // ← ADICIONADO
+        'assigned_doctor_id', // ← ADICIONADO
         'password',
         'email_verified_at',
         'is_active',
@@ -31,7 +38,7 @@ class Patient extends Authenticatable
         'photo_path',
         'password_reset_token',
         'password_reset_expires',
-        'first_login_at', // ← NOVO
+        'first_login_at',
     ];
 
     protected $hidden = [
@@ -72,6 +79,16 @@ class Patient extends Authenticatable
         return $this->belongsToMany(Insurance::class, 'patient_insurances')
                     ->withPivot('policy_number', 'valid_from', 'valid_until', 'is_primary', 'is_active')
                     ->withTimestamps();
+    }
+
+        public function primaryInsurance()
+    {
+        return $this->belongsTo(Insurance::class, 'insurance_id');
+    }
+
+    public function assignedDoctor()
+    {
+        return $this->belongsTo(User::class, 'assigned_doctor_id');
     }
 
     public function activities(): HasMany

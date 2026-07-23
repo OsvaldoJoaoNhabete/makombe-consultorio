@@ -3,73 +3,84 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable, HasRoles;
+    use HasFactory, Notifiable, SoftDeletes, HasRoles;
 
+    /**
+     * Os atributos que podem ser preenchidos em massa.
+     *
+     * @var array<int, string>
+     */
     protected $fillable = [
         'name',
         'email',
         'password',
         'phone',
+        'specialty_id',
         'is_active',
-        'photo_path',
+        'photo',
+        'must_change_password', // IMPORTANTE: Adicionar aqui
     ];
 
+    /**
+     * Os atributos que devem ser ocultados na serialização.
+     *
+     * @var array<int, string>
+     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    protected function casts(): array
+    /**
+     * Os atributos que devem ser convertidos para tipos nativos.
+     *
+     * @var array<string, string>
+     */
+    protected $casts = [
+        'email_verified_at' => 'datetime',
+        'password' => 'hashed',
+        'is_active' => 'boolean',
+        'must_change_password' => 'boolean', // IMPORTANTE: Cast para boolean
+    ];
+
+    /**
+     * Relação com a Especialidade.
+     */
+    public function specialty()
     {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-            'is_active' => 'boolean',
-        ];
+        return $this->belongsTo(Specialty::class, 'specialty_id');
     }
 
-    // ============================================
-    // HELPERS DE FOTO
-    // ============================================
-
-    public function getPhotoUrl(): string
+    // NOVA RELAÇÃO: Disponibilidades
+    public function availabilities()
     {
-        if ($this->photo_path && file_exists(public_path('storage/' . $this->photo_path))) {
-            return asset('storage/' . $this->photo_path);
-        }
-        return '';
+        return $this->hasMany(ProfessionalAvailability::class, 'user_id');
     }
 
+    /**
+     * Verifica se o utilizador tem uma foto de perfil.
+     */
     public function hasPhoto(): bool
     {
-        return !empty($this->photo_path) && file_exists(public_path('storage/' . $this->photo_path));
+        return !empty($this->photo);
     }
 
-    public function getInitial(): string
+    /**
+     * Obtém o URL da foto de perfil.
+     */
+    public function getPhotoUrl(): string
     {
-        return strtoupper(substr($this->name ?? '?', 0, 1));
-    }
-
-    public function getAvatarColor(): string
-    {
-        $colors = [
-            'from-blue-500 to-indigo-600',
-            'from-purple-500 to-pink-600',
-            'from-green-500 to-emerald-600',
-            'from-amber-500 to-orange-600',
-            'from-red-500 to-rose-600',
-            'from-teal-500 to-cyan-600',
-            'from-indigo-500 to-purple-600',
-            'from-pink-500 to-rose-600',
-        ];
+        if ($this->hasPhoto()) {
+            return asset('storage/' . $this->photo);
+        }
         
-        $index = ord($this->getInitial()) % count($colors);
-        return $colors[$index];
+        return 'https://ui-avatars.com/api/?name=' . urlencode($this->name) . '&color=FFFFFF&background=6d28d9&size=128&font-size=0.4';
     }
 }

@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Models\Specialty;
+
 
 class Consultation extends Model
 {
@@ -33,6 +35,11 @@ class Consultation extends Model
         'video_call_started_at',
         'video_call_ended_at',
         'patient_notified_at',
+        'specialty_id',
+        'is_urgent',
+        'rating',
+        'review_comment',
+        'reviewed_at',
     ];
 
     protected $casts = [
@@ -43,6 +50,9 @@ class Consultation extends Model
         'total_amount' => 'decimal:2',
         'insurance_coverage' => 'decimal:2',
         'patient_amount' => 'decimal:2',
+        'is_urgent' => 'boolean',
+        'rating' => 'integer',
+        'reviewed_at' => 'datetime',
     ];
 
     // ============================================
@@ -73,6 +83,24 @@ class Consultation extends Model
     {
         return $this->hasMany(Payment::class);
     }
+
+    public function specialty(): BelongsTo
+    {
+        return $this->belongsTo(Specialty::class);
+    }
+
+    public function isReviewed(): bool
+    {
+        return $this->rating !== null;
+    }
+
+    public function getStarsAttribute(): string
+    {
+        if (!$this->rating) return '';
+        return str_repeat('★', $this->rating) . str_repeat('☆', 5 - $this->rating);
+    }
+
+
 
     // ============================================
     // MÉTODOS AUXILIARES

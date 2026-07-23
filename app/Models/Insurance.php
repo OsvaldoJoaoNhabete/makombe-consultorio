@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Storage; // <--- ADICIONAR ESTA LINHA
 
 class Insurance extends Model
 {
@@ -54,9 +55,10 @@ class Insurance extends Model
 
     public function getLogoUrl(): string
     {
-        if ($this->logo_path && file_exists(public_path('storage/' . $this->logo_path))) {
+        if ($this->logo_path && Storage::disk('public')->exists($this->logo_path)) {
             return asset('storage/' . $this->logo_path);
         }
-        return asset('images/default-insurance.png');
+        // Fallback: um ícone de seguradora genérico ou iniciais
+        return 'https://ui-avatars.com/api/?name=' . urlencode($this->name) . '&background=6d28d9&color=fff&size=128';
     }
 }

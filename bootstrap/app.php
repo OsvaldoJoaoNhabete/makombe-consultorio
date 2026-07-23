@@ -11,15 +11,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // Alias de middleware personalizados
+        // Apenas os middlewares do Spatie Permission (Obrigatório)
         $middleware->alias([
-            'role' => \App\Http\Middleware\CheckRole::class,
-            'patient.auth' => \App\Http\Middleware\PatientAuth::class,
+            'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
+            'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
+            'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
         ]);
-
-        // Redirecionamentos de autenticação
-        $middleware->redirectUsersTo('/dashboard');
-        $middleware->redirectGuestsTo('/login');
     })
     ->withExceptions(function (Exceptions $exceptions) {
         //

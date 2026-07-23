@@ -6,15 +6,17 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ config('app.name', 'Makombe') }} • {{ $title ?? 'Painel Admin' }}</title>
     
+    <!-- Tailwind CSS e Chart.js -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&display=swap" rel="stylesheet">
+    
+    <!-- Fonte Poppins (Preferência do Sistema) -->
+    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
         body { font-family: 'Lato', sans-serif; }
         
-        /* Sidebar Staff Personalizada */
         .sidebar { 
             position: fixed; top: 0; left: 0; height: 100vh; width: 270px; 
             background: linear-gradient(180deg, #4c1d95 0%, #5b21b6 50%, #6d28d9 100%); 
@@ -48,7 +50,6 @@
             .main-content { margin-left: 0; } 
         }
         
-        /* Scrollbar personalizada para a sidebar */
         .sidebar::-webkit-scrollbar { width: 6px; }
         .sidebar::-webkit-scrollbar-track { background: transparent; }
         .sidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
@@ -57,7 +58,6 @@
 </head>
 <body class="bg-slate-50 text-slate-800">
 
-    <!-- Overlay para mobile -->
     <div id="sidebar-overlay" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 hidden md:hidden" onclick="toggleSidebar()"></div>
 
     <aside class="sidebar" id="sidebar">
@@ -82,6 +82,10 @@
             <a href="{{ route('dashboard') }}" class="nav-item {{ request()->routeIs('dashboard') ? 'active' : '' }}">
                 <i class="fas fa-th-large"></i> Dashboard
             </a>
+            <a href="{{ route('profile.edit') }}" class="nav-item flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 {{ request()->routeIs('profile.edit') ? 'active' : '' }}">
+                <i class="fas fa-user"></i>
+                        <span>Meu Perfil</span>
+                    </a>
             <a href="{{ route('patients.index') }}" class="nav-item {{ request()->routeIs('patients.*') ? 'active' : '' }}">
                 <i class="fas fa-users"></i> Pacientes
             </a>
@@ -92,7 +96,11 @@
                 <i class="fas fa-file-invoice-dollar"></i> Cotações
             </a>
 
-            @php $userRoles = auth()->user()->roles->pluck('name')->toArray(); @endphp
+            {{-- CORREÇÃO AQUI: Uso do operador nullsafe (?->) e fallback (?? []) --}}
+            @php 
+                $userRoles = auth()->user()->roles?->pluck('name')->toArray() ?? []; 
+            @endphp
+            
             @if(in_array('Medico', $userRoles) || in_array('Administrador', $userRoles) || in_array('Gerente', $userRoles))
                 <a href="{{ route('doctor.index') }}" class="nav-item {{ request()->routeIs('doctor.*') ? 'active' : '' }}">
                     <i class="fas fa-user-md"></i> Meu Atendimento
@@ -117,6 +125,9 @@
                 <a href="{{ route('users.index') }}" class="nav-item {{ request()->routeIs('users.*') ? 'active' : '' }}">
                     <i class="fas fa-user-shield"></i> Utilizadores
                 </a>
+                <a href="{{ route('admin.specialties.index') }}" class="nav-item {{ request()->routeIs('admin.specialties.*') ? 'active' : '' }}">
+                    <i class="fas fa-stethoscope"></i> Especialidades
+                </a>
                 <a href="{{ route('insurances.index') }}" class="nav-item {{ request()->routeIs('insurances.*') ? 'active' : '' }}">
                     <i class="fas fa-shield-alt"></i> Seguradoras
                 </a>
@@ -131,15 +142,20 @@
         <div class="p-4 border-t border-white/10 bg-black/10">
             @auth
                 <div class="flex items-center gap-3">
-                    <div class="h-11 w-11 rounded-full bg-gradient-to-br from-violet-400 to-fuchsia-500 flex items-center justify-center text-white font-bold shadow-lg border-2 border-white/20">
-                        {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
+                    <div class="h-11 w-11 rounded-full bg-gradient-to-br from-violet-400 to-fuchsia-500 flex items-center justify-center text-white font-bold shadow-lg border-2 border-white/20 overflow-hidden">
+                        {{-- Verifica se existe foto, senão mostra a inicial --}}
+                        @if(auth()->user()->profile_photo_path)
+                            <img src="{{ asset('storage/' . auth()->user()->profile_photo_path) }}" alt="Foto" class="w-full h-full object-cover">
+                        @else
+                            {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
+                        @endif
                     </div>
                     <div class="flex-1 min-w-0">
                         <p class="text-sm font-bold text-white truncate">{{ auth()->user()->name }}</p>
-                        <p class="text-xs text-violet-300 truncate">{{ auth()->user()->roles->first()?->name ?? 'Utilizador' }}</p>
+                        {{-- CORREÇÃO AQUI: Uso do operador nullsafe (?->) --}}
+                        <p class="text-xs text-violet-300 truncate">{{ auth()->user()->roles?->first()?->name ?? 'Utilizador' }}</p>
                     </div>
-                    <form method="POST" action="{{ route('staff.logout') }}" class="inline">
-                        @csrf
+                        <form method="POST" action="{{ route('logout') }}">                        @csrf
                         <button type="submit" class="text-violet-300 hover:text-white hover:bg-white/10 p-2 rounded-lg transition" title="Sair">
                             <i class="fas fa-sign-out-alt"></i>
                         </button>
@@ -164,7 +180,7 @@
                     <span class="hidden sm:inline text-sm text-slate-500">
                         <i class="far fa-calendar-alt mr-1"></i> {{ now()->format('d/m/Y') }}
                     </span>
-                    <form method="POST" action="{{ route('staff.logout') }}" class="inline">
+                    <form method="POST" action="{{ route('logout') }}" class="inline">
                         @csrf
                         <button type="submit" class="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition text-sm font-semibold flex items-center gap-2">
                             <i class="fas fa-sign-out-alt"></i> <span class="hidden sm:inline">Sair</span>
@@ -177,12 +193,12 @@
         <main class="p-6 md:p-8">
             @auth
                 @if (session('success'))
-                    <div class="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 flex items-center gap-3 shadow-sm">
+                    <div class="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 flex items-center gap-3 shadow-sm animate-fade-in">
                         <i class="fas fa-check-circle text-xl"></i> {{ session('success') }}
                     </div>
                 @endif
                 @if (session('error'))
-                    <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-800 flex items-center gap-3 shadow-sm">
+                    <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-800 flex items-center gap-3 shadow-sm animate-fade-in">
                         <i class="fas fa-exclamation-circle text-xl"></i> {{ session('error') }}
                     </div>
                 @endif

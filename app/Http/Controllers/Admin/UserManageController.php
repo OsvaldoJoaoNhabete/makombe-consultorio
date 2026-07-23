@@ -4,39 +4,35 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\Specialty;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\Rules\Password;
 use Spatie\Permission\Models\Role;
 
 class UserManageController extends Controller
 {
     /**
-     * Lista de utilizadores
+     * Display a listing of the resource.
      */
     public function index(Request $request)
     {
-        $search = $request->input('search');
+        $roles = Role::all();
+        $search = $request->input('search', '');
         $role = $request->input('role', 'all');
         $status = $request->input('status', 'all');
 
-        $query = User::with('roles');
+        $query = User::query()->with(['roles', 'specialty']);
 
-        if ($search) {
+        if (!empty($search)) {
             $query->where(function($q) use ($search) {
-                $q->where('name', 'LIKE', "%{$search}%")
-                  ->orWhere('email', 'LIKE', "%{$search}%")
-                  ->orWhere('phone', 'LIKE', "%{$search}%");
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('phone', 'like', "%{$search}%");
             });
         }
 
         if ($role !== 'all') {
-            $query->whereHas('roles', function($q) use ($role) {
-                $q->where('name', $role);
-            });
+            $query->role($role);
         }
 
         if ($status === 'active') {
@@ -45,201 +41,190 @@ class UserManageController extends Controller
             $query->where('is_active', false);
         }
 
-        $users = $query->orderByDesc('created_at')->paginate(15)->withQueryString();
+        $users = $query->latest()->paginate(15);
 
         $stats = [
-            'total' => User::count(),
-            'ativos' => User::where('is_active', true)->count(),
-            'inativos' => User::where('is_active', false)->count(),
-            'medicos' => User::role('Medico')->count(),
+            'total'           => User::count(),
+            'ativos'          => User::where('is_active', true)->count(),
+            'inativos'        => User::where('is_active', false)->count(),
+            'medicos'         => User::role('Medico')->count(),
         ];
-
-        $roles = Role::orderBy('name')->get();
 
         return view('admin.users.index', compact('users', 'stats', 'roles', 'search', 'role', 'status'));
     }
 
     /**
-     * Formulário de criação
+     * Show the form for creating a new resource.
      */
     public function create()
     {
-        $roles = Role::orderBy('name')->get();
-        return view('admin.users.form', compact('roles'));
+        $roles = Role::all();
+        $specialties = Specialty::all();
+        return view('admin.users.create', compact('roles', 'specialties'));
     }
 
-    /**
-     * Salvar novo utilizador
-     */
-    public function store(Request $request)
+       public function store(Request $request)
     {
+        $availableRoles = \Spatie\Permission\Models\Role::pluck('name')->toArray();
+
         $validated = $request->validate([
-            'name' => ['required', 'string', 'min:3', 'max:150'],
-            'email' => ['required', 'email', 'max:150', 'unique:users,email'],
+            'name' => ['required', 'string', 'max:255', 'min:3'],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'phone' => ['nullable', 'string', 'max:20'],
-            'role' => ['required', 'exists:roles,name'],
-            'password' => ['required', 'string', 'min:6', 'confirmed'],
-            'photo' => ['nullable', 'image', 'mimes:jpeg,png,jpg', 'max:2048'],
-        ], [
-            'name.required' => 'O nome é obrigatório.',
-            'email.required' => 'O email é obrigatório.',
-            'email.unique' => 'Este email já está registado.',
-            'role.required' => 'Selecione uma função.',
-            'password.required' => 'A senha é obrigatória.',
-            'password.confirmed' => 'As senhas não coincidem.',
+            'password' => ['required', 'string', 'min:8', 'max:255', 'confirmed'],
+            'role' => ['required', 'string', 'in:' . implode(',', $availableRoles)],
+            'specialty_id' => ['nullable', 'exists:specialties,id'],
+            'is_active' => ['nullable', 'boolean'],
+            'photo' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:2048'],
+            'availabilities' => ['nullable', 'array'],
+            'availabilities.*.day_of_week' => ['required_with:availabilities', 'in:monday,tuesday,wednesday,thursday,friday,saturday,sunday'],
+            'availabilities.*.start_time' => ['required_with:availabilities', 'date_format:H:i'],
+            'availabilities.*.end_time' => ['required_with:availabilities', 'date_format:H:i', 'after:availabilities.*.start_time'],
         ]);
 
+        // Gestão do upload da foto
         $photoPath = null;
         if ($request->hasFile('photo')) {
-            $photoPath = $request->file('photo')->store('users/photos', 'public');
+            $file = $request->file('photo');
+            $fileName = time() . '_' . str_replace(' ', '_', $validated['name']) . '.' . $file->getClientOriginalExtension();
+            $photoPath = $file->storeAs('users/photos', $fileName, 'public');
         }
 
-        $user = User::create([
-            'name' => $validated['name'],
-            'email' => strtolower($validated['email']),
+        // Criar o utilizador
+        $user = \App\Models\User::create([
+            'name' => trim($validated['name']),
+            'email' => strtolower(trim($validated['email'])),
             'phone' => $validated['phone'] ?? null,
-            'password' => Hash::make($validated['password']),
-            'email_verified_at' => now(),
-            'is_active' => true,
-            'photo_path' => $photoPath,
+            'password' => bcrypt($validated['password']),
+            'specialty_id' => $validated['specialty_id'] ?? null,
+            'is_active' => $request->has('is_active'),
+            'photo' => $photoPath,
+            'must_change_password' => true,
         ]);
 
+        // Atribuir a Role
         $user->assignRole($validated['role']);
 
-        Log::info('Utilizador criado', [
-            'user_id' => $user->id,
-            'name' => $user->name,
-            'role' => $validated['role'],
-            'created_by' => Auth::id(),
-        ]);
+        // Guardar disponibilidades
+        if (isset($validated['availabilities']) && is_array($validated['availabilities'])) {
+            foreach ($validated['availabilities'] as $availability) {
+                if (!empty($availability['day_of_week']) && !empty($availability['start_time']) && !empty($availability['end_time'])) {
+                    \App\Models\ProfessionalAvailability::create([
+                        'user_id' => $user->id,
+                        'day_of_week' => $availability['day_of_week'],
+                        'start_time' => $availability['start_time'],
+                        'end_time' => $availability['end_time'],
+                        'is_active' => true,
+                    ]);
+                }
+            }
+        }
 
-        return redirect()
-            ->route('users.show', $user->id)
-            ->with('success', "✅ Utilizador criado com sucesso! Função: {$validated['role']}");
+        return redirect()->route('users.index')
+            ->with('success', 'Utilizador "' . $user->name . '" criado com sucesso!');
     }
 
     /**
-     * Detalhes do utilizador
+     * Display the specified resource.
      */
-    public function show($id)
+    public function show(string $id)
     {
-        $user = User::with('roles')->findOrFail($id);
+        $user = User::with(['roles', 'specialty'])->findOrFail($id);
         return view('admin.users.show', compact('user'));
     }
 
     /**
-     * Formulário de edição
+     * Show the form for editing the specified resource.
      */
-    public function edit($id)
+    public function edit(string $id)
     {
-        $user = User::with('roles')->findOrFail($id);
-        $roles = Role::orderBy('name')->get();
-        return view('admin.users.form', compact('user', 'roles'));
+        $user = User::with(['roles', 'specialty'])->findOrFail($id);
+        $roles = Role::all();
+        $specialties = Specialty::all();
+        
+        return view('admin.users.edit', compact('user', 'roles', 'specialties'));
     }
 
     /**
-     * Atualizar utilizador
+     * Update the specified resource in storage.
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, string $id)
     {
         $user = User::findOrFail($id);
+        $availableRoles = Role::pluck('name')->toArray();
 
         $validated = $request->validate([
-            'name' => ['required', 'string', 'min:3', 'max:150'],
-            'email' => ['required', 'email', 'max:150', 'unique:users,email,' . $user->id],
+            'name' => ['required', 'string', 'max:255', 'min:3'],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email,' . $user->id],
             'phone' => ['nullable', 'string', 'max:20'],
-            'role' => ['required', 'exists:roles,name'],
-            'password' => ['nullable', 'string', 'min:6', 'confirmed'],
-            'photo' => ['nullable', 'image', 'mimes:jpeg,png,jpg', 'max:2048'],
-            'remove_photo' => ['nullable', 'boolean'],
+            'password' => ['nullable', 'string', 'min:8', 'max:255', 'confirmed'],
+            'role' => ['required', 'string', 'in:' . implode(',', $availableRoles)],
+            'specialty_id' => ['nullable', 'exists:specialties,id'],
+            'is_active' => ['nullable', 'boolean'],
+            'photo' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:2048'],
+        ], [
+            'name.required' => 'O nome completo é obrigatório.',
+            'email.required' => 'O e-mail é obrigatório.',
+            'email.unique' => 'Este e-mail já está em uso.',
+            'phone.max' => 'O telefone não pode exceder 20 caracteres.',
+            'password.min' => 'A palavra-passe deve ter pelo menos 8 caracteres.',
+            'password.confirmed' => 'As palavras-passe não coincidem.',
+            'role.required' => 'Deve selecionar uma função.',
         ]);
 
-        $data = [
-            'name' => $validated['name'],
-            'email' => strtolower($validated['email']),
-            'phone' => $validated['phone'] ?? null,
-        ];
-
-        if (!empty($validated['password'])) {
-            $data['password'] = Hash::make($validated['password']);
-        }
-
-        if ($request->boolean('remove_photo') && $user->photo_path) {
-            Storage::disk('public')->delete($user->photo_path);
-            $data['photo_path'] = null;
-        }
-
+        // Gestão da foto
         if ($request->hasFile('photo')) {
-            if ($user->photo_path) {
-                Storage::disk('public')->delete($user->photo_path);
+            if ($user->photo) {
+                Storage::disk('public')->delete($user->photo);
             }
-            $data['photo_path'] = $request->file('photo')->store('users/photos', 'public');
+            $file = $request->file('photo');
+            $fileName = time() . '_' . str_replace(' ', '_', $validated['name']) . '.' . $file->getClientOriginalExtension();
+            $validated['photo'] = $file->storeAs('users/photos', $fileName, 'public');
+        } else {
+            unset($validated['photo']);
         }
 
-        $user->update($data);
+        // Gestão da password
+        if (!empty($validated['password'])) {
+            $validated['password'] = bcrypt($validated['password']);
+            $validated['must_change_password'] = false; // Resetar flag após mudança
+        } else {
+            unset($validated['password']);
+            unset($validated['must_change_password']);
+        }
 
-        // Atualizar role
-        $user->syncRoles([$validated['role']]);
+        $user->update($validated);
+        $user->syncRoles($validated['role']);
 
-        Log::info('Utilizador atualizado', [
-            'user_id' => $user->id,
-            'role' => $validated['role'],
-            'updated_by' => Auth::id(),
-        ]);
-
-        return redirect()
-            ->route('users.show', $user->id)
-            ->with('success', '✅ Utilizador atualizado com sucesso!');
+        return redirect()->route('users.index')->with('success', 'Utilizador "' . $user->name . '" atualizado com sucesso!');
     }
 
     /**
-     * Ativar/Desativar utilizador
+     * Toggle active/inactive status.
      */
-    public function toggleStatus($id)
+    public function toggleStatus(string $id)
     {
         $user = User::findOrFail($id);
+        $user->is_active = !$user->is_active;
+        $user->save();
 
-        if ($user->id === Auth::id()) {
-            return back()->with('error', '❌ Não pode desativar a sua própria conta.');
-        }
-
-        $user->update(['is_active' => !$user->is_active]);
-
-        $status = $user->is_active ? 'ativado' : 'desativado';
-
-        return back()->with('success', "✅ Utilizador {$status} com sucesso!");
+        $message = $user->is_active ? 'Utilizador ativado com sucesso.' : 'Utilizador desativado com sucesso.';
+        return redirect()->route('users.index')->with('success', $message);
     }
 
     /**
-     * Excluir utilizador
+     * Remove the specified resource from storage.
      */
-    public function destroy($id)
+    public function destroy(string $id)
     {
         $user = User::findOrFail($id);
-
-        // Proteção: não pode excluir a si mesmo
-        if ($user->id === Auth::id()) {
-            return back()->with('error', ' Não pode excluir a sua própria conta.');
+        
+        if ($user->photo) {
+            Storage::disk('public')->delete($user->photo);
         }
-
-        // Proteção: não pode excluir o último administrador
-        if ($user->hasRole('Administrador') && User::role('Administrador')->count() <= 1) {
-            return back()->with('error', '❌ Não pode excluir o último administrador do sistema.');
-        }
-
-        if ($user->photo_path) {
-            Storage::disk('public')->delete($user->photo_path);
-        }
-
+        
         $user->delete();
 
-        Log::info('Utilizador excluído', [
-            'user_id' => $user->id,
-            'deleted_by' => Auth::id(),
-        ]);
-
-        return redirect()
-            ->route('users.index')
-            ->with('success', '✅ Utilizador excluído com sucesso.');
+        return redirect()->route('users.index')->with('success', 'Utilizador eliminado com sucesso.');
     }
 }
