@@ -7,95 +7,72 @@ use App\Models\Payment;
 use App\Models\Patient;
 use App\Models\Consultation;
 use App\Models\Quote;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class FinanceController extends Controller
 {
     /**
-     * Dashboard Financeiro
+     * Dashboard Financeiro Geral
+     * Sugestão 1: Apenas Gerente, Financeiro, Contabilista, Administrador, Proprietária podem ver
      */
     public function dashboard(Request $request)
     {
-        $period = $request->input('period', 'month');
-        
-        // Definir período
-        switch ($period) {
-            case 'today':
-                $start = Carbon::today();
-                $end = Carbon::today()->endOfDay();
-                break;
-            case 'week':
-                $start = Carbon::now()->startOfWeek();
-                $end = Carbon::now()->endOfWeek();
-                break;
-            case 'year':
-                $start = Carbon::now()->startOfYear();
-                $end = Carbon::now()->endOfYear();
-                break;
-            default: // month
-                $start = Carbon::now()->startOfMonth();
-                $end = Carbon::now()->endOfMonth();
-        }
+        $currentMonth = Carbon::now()->month;
+        $currentYear = Carbon::now()->year;
 
-        // Estatísticas
-        $totalReceita = Payment::where('status', 'confirmado')
-            ->whereBetween('created_at', [$start, $end])
-            ->sum('amount');
+        // Receita total do mês (todas as consultas concluídas)
+        $monthlyRevenue = Consultation::where('status', 'concluida')
+            ->whereMonth('scheduled_at', $currentMonth)
+            ->whereYear('scheduled_at', $currentYear)
+            ->sum('total_amount');
 
-        $totalPendente = Payment::where('status', 'pendente')
-            ->whereBetween('created_at', [$start, $end])
-            ->sum('amount');
+        // Receita acumulada (histórico total)
+        $accumulatedRevenue = Consultation::where('status', 'concluida')
+            ->sum('total_amount');
 
-        $totalCancelado = Payment::where('status', 'cancelado')
-            ->whereBetween('created_at', [$start, $end])
-            ->sum('amount');
-
-        $totalPagamentos = Payment::where('status', 'confirmado')
-            ->whereBetween('created_at', [$start, $end])
+        // Total de consultas do mês
+        $monthlyConsultations = Consultation::whereMonth('scheduled_at', $currentMonth)
+            ->whereYear('scheduled_at', $currentYear)
             ->count();
 
-        // Pagamentos recentes
-        $payments = Payment::with(['patient', 'consultation', 'createdBy'])
-            ->orderByDesc('created_at')
+        // Consultas concluídas do mês
+        $completedConsultations = Consultation::where('status', 'concluida')
+            ->whereMonth('scheduled_at', $currentMonth)
+            ->whereYear('scheduled_at', $currentYear)
+            ->count();
+
+        // Receita por médico (ranking do mês)
+        $revenueByDoctor = Consultation::where('status', 'concluida')
+            ->whereMonth('scheduled_at', $currentMonth)
+            ->whereYear('scheduled_at', $currentYear)
+            ->select('doctor_id', DB::raw('SUM(total_amount) as total'))
+            ->groupBy('doctor_id')
+            ->orderByDesc('total')
+            ->with('doctor')
             ->limit(10)
             ->get();
 
-        // Pagamentos por método (para gráfico)
-        $paymentsByMethod = Payment::where('status', 'confirmado')
-            ->whereBetween('created_at', [$start, $end])
-            ->select('method')
-            ->selectRaw('SUM(amount) as total')
-            ->groupBy('method')
-            ->get();
-
-        // Receita dos últimos 7 dias (para gráfico de linha)
-        $last7Days = [];
-        $revenue7Days = [];
-        for ($i = 6; $i >= 0; $i--) {
-            $date = Carbon::now()->subDays($i);
-            $last7Days[] = $date->format('d/m');
-            $revenue7Days[] = Payment::where('status', 'confirmado')
-                ->whereDate('created_at', $date)
-                ->sum('amount');
-        }
+        // Pagamentos pendentes
+        $pendingPayments = Consultation::where('payment_status', 'pendente')
+            ->where('status', 'concluida')
+            ->count();
 
         $stats = [
-            'total_receita' => $totalReceita,
-            'total_pendente' => $totalPendente,
-            'total_cancelado' => $totalCancelado,
-            'total_pagamentos' => $totalPagamentos,
-            'media_pagamento' => $totalPagamentos > 0 ? $totalReceita / $totalPagamentos : 0,
+            'monthly_revenue' => $monthlyRevenue,
+            'accumulated_revenue' => $accumulatedRevenue,
+            'monthly_consultations' => $monthlyConsultations,
+            'completed_consultations' => $completedConsultations,
+            'pending_payments' => $pendingPayments,
         ];
 
-        return view('admin.finance.index', compact(
-            'stats', 'payments', 'paymentsByMethod',
-            'last7Days', 'revenue7Days', 'period',
-            'start', 'end'
-        ));
+        return view('admin.finance.dashboard', compact('stats', 'revenueByDoctor', 'currentMonth', 'currentYear'));
     }
+
 
     /**
      * Lista de pagamentos

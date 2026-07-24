@@ -3,184 +3,193 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Consultation;
+use App\Models\Patient;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
-
-use App\Models\Consultation;
-use App\Models\PatientActivityLog;
 
 class DoctorDashboardController extends Controller
 {
+    /**
+     * Dashboard Individual do Médico/Enfermeiro
+     * Sugestão 1: Cada médico vê apenas as suas próprias estatísticas
+     */
     public function index(Request $request)
     {
-        $doctor = Auth::user();
-        $filterDate = $request->input('date', today()->format('Y-m-d'));
-        $filterStatus = $request->input('status', 'all');
+        $user = Auth::user();
+        $currentMonth = Carbon::now()->month;
+        $currentYear = Carbon::now()->year;
 
-        $query = Consultation::where('doctor_id', $doctor->id)
-            ->with(['patient', 'insurance']);
+        // Sugestão 9: Médico só vê pacientes que atendeu
+        $myPatients = Patient::whereHas('consultations', function ($query) use ($user) {
+            $query->where('doctor_id', $user->id);
+        })->count();
 
-        if ($filterDate) {
-            $query->whereDate('scheduled_at', $filterDate);
-        }
+        // Total de consultas do médico (todas)
+        $totalConsultations = Consultation::where('doctor_id', $user->id)->count();
 
-        if ($filterStatus !== 'all') {
-            $query->where('status', $filterStatus);
-        }
+        // Consultas do mês atual
+        $monthlyConsultations = Consultation::where('doctor_id', $user->id)
+            ->whereMonth('scheduled_at', $currentMonth)
+            ->whereYear('scheduled_at', $currentYear)
+            ->count();
 
-        $consultations = $query->orderBy('scheduled_at')->get();
-
-        $stats = [
-            'total' => Consultation::where('doctor_id', $doctor->id)->count(),
-            'hoje' => Consultation::where('doctor_id', $doctor->id)
-                ->whereDate('scheduled_at', today())->count(),
-            'agendadas' => Consultation::where('doctor_id', $doctor->id)
-                ->where('status', 'agendada')->count(),
-            'concluidas' => Consultation::where('doctor_id', $doctor->id)
-                ->where('status', 'concluida')->count(),
-        ];
-
-        return view('admin.doctor.index', compact('consultations', 'stats', 'filterDate', 'filterStatus'));
-    }
-
-    public function show($id)
-    {
-        $doctor = Auth::user();
-        
-        $consultation = Consultation::where('doctor_id', $doctor->id)
-            ->where('id', $id)
-            ->with(['patient', 'insurance', 'createdBy'])
-            ->firstOrFail();
-
-        $patientHistory = Consultation::where('patient_id', $consultation->patient_id)
-            ->where('id', '!=', $consultation->id)
+        // Receita do mês atual (Sugestão 1: Receita individual mensal)
+        $monthlyRevenue = Consultation::where('doctor_id', $user->id)
+            ->whereMonth('scheduled_at', $currentMonth)
+            ->whereYear('scheduled_at', $currentYear)
             ->where('status', 'concluida')
-            ->with('doctor')
-            ->orderByDesc('scheduled_at')
-            ->limit(5)
+            ->sum('total_amount');
+
+        // Receita acumulada (total histórico)
+        $accumulatedRevenue = Consultation::where('doctor_id', $user->id)
+            ->where('status', 'concluida')
+            ->sum('total_amount');
+
+        // Consultas de hoje
+        $todayConsultations = Consultation::where('doctor_id', $user->id)
+            ->whereDate('scheduled_at', today())
+            ->orderBy('scheduled_at', 'asc')
             ->get();
 
-        return view('admin.doctor.show', compact('doctor', 'consultation', 'patientHistory'));
+        // Próximas consultas (próximos 7 dias)
+        $upcomingConsultations = Consultation::where('doctor_id', $user->id)
+            ->where('scheduled_at', '>=', now())
+            ->where('scheduled_at', '<=', now()->addDays(7))
+            ->whereNotIn('status', ['cancelada', 'faltou', 'concluida'])
+            ->orderBy('scheduled_at', 'asc')
+            ->with(['patient', 'specialty'])
+            ->limit(10)
+            ->get();
+
+        // Estatísticas por status do mês atual
+        $statusStats = Consultation::where('doctor_id', $user->id)
+            ->whereMonth('scheduled_at', $currentMonth)
+            ->whereYear('scheduled_at', $currentYear)
+            ->select('status', DB::raw('count(*) as count'))
+            ->groupBy('status')
+            ->pluck('count', 'status');
+
+        $stats = [
+            'my_patients' => $myPatients,
+            'total_consultations' => $totalConsultations,
+            'monthly_consultations' => $monthlyConsultations,
+            'monthly_revenue' => $monthlyRevenue,
+            'accumulated_revenue' => $accumulatedRevenue,
+            'today_consultations' => $todayConsultations->count(),
+            'agendadas' => $statusStats['agendada'] ?? 0,
+            'confirmadas' => $statusStats['confirmada'] ?? 0,
+            'concluidas' => $statusStats['concluida'] ?? 0,
+            'canceladas' => $statusStats['cancelada'] ?? 0,
+        ];
+
+        return view('admin.doctor.dashboard', compact(
+            'stats',
+            'todayConsultations',
+            'upcomingConsultations',
+            'currentMonth',
+            'currentYear'
+        ));
     }
 
+    /**
+     * Detalhes de uma consulta específica do médico
+     */
+    public function show($id)
+    {
+        $user = Auth::user();
+        
+        $consultation = Consultation::with(['patient', 'doctor.specialty', 'insurance'])
+            ->where('doctor_id', $user->id)
+            ->findOrFail($id);
+
+        return view('admin.doctor.consultation-show', compact('consultation'));
+    }
+
+    /**
+     * Atender consulta (iniciar atendimento)
+     */
     public function attend($id)
     {
-        $doctor = Auth::user();
+        $user = Auth::user();
+        $consultation = Consultation::where('doctor_id', $user->id)->findOrFail($id);
         
-        $consultation = Consultation::where('doctor_id', $doctor->id)
-            ->where('id', $id)
-            ->whereIn('status', ['agendada', 'confirmada', 'em_andamento'])
-            ->with(['patient', 'insurance'])
-            ->firstOrFail();
-
-        if ($consultation->type === 'teleconsulta') {
-            if (!$consultation->location || !str_starts_with($consultation->location, 'http')) {
-                $roomName = 'makombe-' . $consultation->id . '-' . uniqid();
-                $consultation->update(['location' => 'https://meet.jit.si/' . $roomName]);
-                $consultation->location = 'https://meet.jit.si/' . $roomName;
-            }
-        }
-
-        if ($consultation->status === 'agendada') {
-            $consultation->update(['status' => 'em_andamento']);
-        }
-        
-        return view('admin.doctor.attend', compact('doctor', 'consultation'));
+        return view('admin.doctor.attend', compact('consultation'));
     }
 
+    /**
+     * Guardar dados do atendimento (prescrição, exames, diagnóstico)
+     */
     public function storeAttendance(Request $request, $id)
     {
-        $doctor = Auth::user();
-        
-        $consultation = Consultation::where('doctor_id', $doctor->id)
-            ->where('id', $id)
-            ->firstOrFail();
+        $user = Auth::user();
+        $consultation = Consultation::where('doctor_id', $user->id)->findOrFail($id);
 
         $validated = $request->validate([
-            'diagnosis' => 'required|string|max:2000',
-            'prescription' => 'nullable|string|max:5000',
-            'observations' => 'nullable|string|max:2000',
-            'total_amount' => 'nullable|numeric|min:0',
+            'prescription' => ['nullable', 'string', 'max:5000'],
+            'clinical_notes' => ['nullable', 'string', 'max:5000'],
+            'diagnosis' => ['nullable', 'string', 'max:2000'],
+            'observations' => ['nullable', 'string', 'max:2000'],
+            'total_amount' => ['nullable', 'numeric', 'min:0'],
         ]);
-
-        $action = $request->input('action', 'save');
 
         $consultation->update([
-            'diagnosis' => $validated['diagnosis'],
             'prescription' => $validated['prescription'] ?? null,
+            'clinical_notes' => $validated['clinical_notes'] ?? null,
+            'diagnosis' => $validated['diagnosis'] ?? null,
             'observations' => $validated['observations'] ?? null,
             'total_amount' => $validated['total_amount'] ?? $consultation->total_amount,
-            'status' => $action === 'complete' ? 'concluida' : 'em_andamento',
+            'status' => 'concluida',
         ]);
 
-        try {
-            PatientActivityLog::log(
-                $consultation->patient_id,
-                'consulta_concluida',
-                "Consulta concluída pelo Dr(a). {$doctor->name}",
-                ['consultation_id' => $consultation->id]
-            );
-        } catch (\Exception $e) {
-            Log::warning('Erro ao registrar log', ['error' => $e->getMessage()]);
-        }
-
         return redirect()
-            ->route('doctor.show', $consultation->id)
-            ->with('success', $action === 'complete' ? '✅ Consulta concluída!' : '✅ Atendimento salvo!');
+            ->route('doctor.index')
+            ->with('success', '✅ Atendimento registado e consulta concluída!');
     }
 
+    /**
+     * Concluir consulta
+     */
     public function complete($id)
     {
-        $doctor = Auth::user();
+        $user = Auth::user();
+        $consultation = Consultation::where('doctor_id', $user->id)->findOrFail($id);
         
-        $consultation = Consultation::where('doctor_id', $doctor->id)
-            ->where('id', $id)
-            ->firstOrFail();
-
-        if ($consultation->status === 'concluida') {
-            return back()->with('error', 'Esta consulta já foi concluída.');
-        }
-
         $consultation->update(['status' => 'concluida']);
 
         return back()->with('success', '✅ Consulta marcada como concluída!');
     }
 
+    /**
+     * Cancelar consulta
+     */
     public function cancel($id)
     {
-        $doctor = Auth::user();
+        $user = Auth::user();
+        $consultation = Consultation::where('doctor_id', $user->id)->findOrFail($id);
         
-        $consultation = Consultation::where('doctor_id', $doctor->id)
-            ->where('id', $id)
-            ->firstOrFail();
-
-        if (in_array($consultation->status, ['concluida', 'cancelada'])) {
-            return back()->with('error', 'Esta consulta não pode ser cancelada.');
-        }
-
         $consultation->update(['status' => 'cancelada']);
 
-        return back()->with('success', 'Consulta cancelada.');
+        return back()->with('success', '✅ Consulta cancelada.');
     }
 
+    /**
+     * Iniciar videochamada (Sugestão 11: Link direto Jitsi)
+     */
     public function startVideoCall($id)
     {
-        $doctor = Auth::user();
-        
-        $consultation = Consultation::where('doctor_id', $doctor->id)
-            ->where('id', $id)
-            ->where('type', 'teleconsulta')
-            ->firstOrFail();
+        $user = Auth::user();
+        $consultation = Consultation::where('doctor_id', $user->id)->findOrFail($id);
 
-        if (!$consultation->location || !str_starts_with($consultation->location, 'http')) {
-            $roomName = 'makombe-' . $consultation->id . '-' . uniqid();
+        // Se não tiver link, gerar um
+        if (!$consultation->location) {
+            $roomName = 'makombe-' . $consultation->id . '-' . time();
             $consultation->update(['location' => 'https://meet.jit.si/' . $roomName]);
         }
 
-        $consultation->startVideoCall();
-
-        return back()->with('success', '✅ Videochamada iniciada! Paciente notificado.');
+        return redirect()->away($consultation->location);
     }
 }

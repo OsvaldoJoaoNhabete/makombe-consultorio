@@ -7,6 +7,7 @@ use App\Models\Consultation;
 use App\Models\Patient;
 use App\Models\User;
 use App\Models\Insurance;
+use App\Models\Specialty;
 use App\Models\PatientActivityLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -25,9 +26,8 @@ class ConsultationManageController extends Controller
         $type = $request->input('type', 'all');
         $doctorId = $request->input('doctor_id', 'all');
 
-        $query = Consultation::with(['patient', 'doctor', 'insurance', 'createdBy']);
+        $query = Consultation::with(['patient', 'doctor', 'specialty', 'insurance']);
 
-        // Filtro por data (padrão: hoje)
         if ($date) {
             $query->whereDate('scheduled_at', $date);
         }
@@ -51,7 +51,6 @@ class ConsultationManageController extends Controller
             ->orderBy('name')
             ->get();
 
-        // Estatísticas (podem ser ajustadas para o dia filtrado ou gerais)
         $stats = [
             'total' => Consultation::whereDate('scheduled_at', $date)->count(),
             'hoje' => Consultation::whereDate('scheduled_at', today())->count(),
@@ -70,9 +69,10 @@ class ConsultationManageController extends Controller
     {
         $patients = Patient::where('is_active', true)->orderBy('full_name')->get();
         $doctors = User::role('Medico')->where('is_active', true)->with('specialty')->orderBy('name')->get();
+        $specialties = Specialty::where('is_active', true)->orderBy('name')->get();
         $insurances = Insurance::where('is_active', true)->orderBy('name')->get();
 
-        return view('admin.consultations.form', compact('patients', 'doctors', 'insurances'));
+        return view('admin.consultations.form', compact('patients', 'doctors', 'specialties', 'insurances'));
     }
 
     /**
@@ -83,20 +83,21 @@ class ConsultationManageController extends Controller
         $validated = $request->validate([
             'patient_id' => ['required', 'exists:patients,id'],
             'doctor_id' => ['required', 'exists:users,id'],
+            'specialty_id' => ['nullable', 'exists:specialties,id'],
             'scheduled_at' => ['required', 'date', 'after:now'],
             'type' => ['required', 'in:presencial,teleconsulta,domicilio'],
-            'insurance_id' => ['nullable', 'exists:insurances,id'],
+            'is_urgent' => ['nullable', 'boolean'],
+            'payment_method' => ['required', 'in:numerario,mobile_money,pos_tpa,transferencia,seguro'],
+            'payment_provider' => ['nullable', 'string', 'max:100'],
+            'payment_reference' => ['nullable', 'string', 'max:100'],
             'total_amount' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            'home_visit_address' => ['required_if:type,domicilio', 'nullable', 'string', 'max:500'],
         ], [
-            'patient_id.required' => 'Selecione um paciente.',
-            'doctor_id.required' => 'Selecione um médico.',
-            'scheduled_at.required' => 'A data e hora são obrigatórias.',
-            'scheduled_at.after' => 'A data da consulta deve ser futura.',
-            'type.required' => 'Selecione o tipo de consulta.',
+            'home_visit_address.required_if' => 'O endereço completo é obrigatório para consultas ao domicílio.',
         ]);
 
-        // 1. Verificar conflito de horário (mesmo médico, mesmo horário exato, não cancelada)
+        // Verificar conflito de horário
         $conflict = Consultation::where('doctor_id', $validated['doctor_id'])
             ->where('scheduled_at', $validated['scheduled_at'])
             ->whereNotIn('status', ['cancelada', 'faltou'])
@@ -108,39 +109,45 @@ class ConsultationManageController extends Controller
                 ->withInput();
         }
 
-        // 2. Gerar link Jitsi automaticamente se for teleconsulta
+        // Sugestão 11: Gerar link Jitsi simples e direto para teleconsulta
         $location = null;
         if ($validated['type'] === 'teleconsulta') {
-            $roomName = 'makombe-' . strtolower(str_replace(' ', '-', $validated['patient_id'])) . '-' . time();
+            $roomName = 'makombe-' . $validated['patient_id'] . '-' . time();
             $location = 'https://meet.jit.si/' . $roomName;
         }
 
-        // 3. Criar a consulta
         $consultation = Consultation::create([
             'patient_id' => $validated['patient_id'],
             'doctor_id' => $validated['doctor_id'],
+            'specialty_id' => $validated['specialty_id'] ?? null,
             'scheduled_at' => $validated['scheduled_at'],
             'type' => $validated['type'],
-            'insurance_id' => $validated['insurance_id'] ?? null,
+            'is_urgent' => $request->has('is_urgent'),
+            'payment_method' => $validated['payment_method'],
+            'payment_provider' => $validated['payment_provider'] ?? null,
+            'payment_reference' => $validated['payment_reference'] ?? null,
             'total_amount' => $validated['total_amount'] ?? 0,
             'notes' => $validated['notes'] ?? null,
+            'home_visit_address' => $validated['home_visit_address'] ?? null,
             'location' => $location,
             'status' => 'agendada',
             'payment_status' => 'pendente',
             'created_by' => Auth::id(),
         ]);
 
-        // 4. Registar atividade no histórico do paciente
-        try {
-            PatientActivityLog::log(
-                $validated['patient_id'],
-                'consulta_agendada',
-                "Consulta agendada para " . Carbon::parse($validated['scheduled_at'])->format('d/m/Y \à\s H:i'),
-                ['consultation_id' => $consultation->id, 'type' => $validated['type']],
-                Auth::id()
-            );
-        } catch (\Exception $e) {
-            Log::warning('Erro ao registrar log de atividade: ' . $e->getMessage());
+        // Registar atividade (opcional, se o modelo PatientActivityLog existir)
+        if (class_exists(PatientActivityLog::class)) {
+            try {
+                PatientActivityLog::log(
+                    $validated['patient_id'],
+                    'consulta_agendada',
+                    "Consulta agendada para " . Carbon::parse($validated['scheduled_at'])->format('d/m/Y \à\s H:i'),
+                    ['consultation_id' => $consultation->id, 'type' => $validated['type']],
+                    Auth::id()
+                );
+            } catch (\Exception $e) {
+                Log::warning('Erro ao registrar log: ' . $e->getMessage());
+            }
         }
 
         return redirect()
@@ -148,12 +155,12 @@ class ConsultationManageController extends Controller
             ->with('success', '✅ Consulta agendada com sucesso!');
     }
 
-    /**
+        /**
      * Detalhes da consulta
      */
     public function show($id)
     {
-        $consultation = Consultation::with(['patient.insurances', 'doctor.specialty', 'insurance', 'createdBy'])
+        $consultation = Consultation::with(['patient', 'doctor.specialty', 'insurance', 'createdBy', 'rating'])
             ->findOrFail($id);
 
         // Histórico recente do paciente (últimas 5 consultas concluídas)
@@ -177,9 +184,10 @@ class ConsultationManageController extends Controller
         
         $patients = Patient::where('is_active', true)->orderBy('full_name')->get();
         $doctors = User::role('Medico')->where('is_active', true)->with('specialty')->orderBy('name')->get();
+        $specialties = Specialty::where('is_active', true)->orderBy('name')->get();
         $insurances = Insurance::where('is_active', true)->orderBy('name')->get();
 
-        return view('admin.consultations.form', compact('consultation', 'patients', 'doctors', 'insurances'));
+        return view('admin.consultations.form', compact('consultation', 'patients', 'doctors', 'specialties', 'insurances'));
     }
 
     /**
@@ -192,15 +200,20 @@ class ConsultationManageController extends Controller
         $validated = $request->validate([
             'patient_id' => ['required', 'exists:patients,id'],
             'doctor_id' => ['required', 'exists:users,id'],
+            'specialty_id' => ['nullable', 'exists:specialties,id'],
             'scheduled_at' => ['required', 'date'],
             'type' => ['required', 'in:presencial,teleconsulta,domicilio'],
-            'insurance_id' => ['nullable', 'exists:insurances,id'],
+            'is_urgent' => ['nullable', 'boolean'],
+            'payment_method' => ['required', 'in:numerario,mobile_money,pos_tpa,transferencia,seguro'],
+            'payment_provider' => ['nullable', 'string', 'max:100'],
+            'payment_reference' => ['nullable', 'string', 'max:100'],
             'total_amount' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            'home_visit_address' => ['required_if:type,domicilio', 'nullable', 'string', 'max:500'],
             'status' => ['required', 'in:agendada,confirmada,em_andamento,concluida,cancelada,faltou'],
         ]);
 
-        // 1. Verificar conflito de horário (excluindo a própria consulta que está a ser editada)
+        // Verificar conflito de horário (excluindo a própria consulta)
         $conflict = Consultation::where('doctor_id', $validated['doctor_id'])
             ->where('scheduled_at', $validated['scheduled_at'])
             ->where('id', '!=', $consultation->id)
@@ -213,7 +226,7 @@ class ConsultationManageController extends Controller
                 ->withInput();
         }
 
-        // 2. Gerar link Jitsi se o tipo for alterado para teleconsulta e ainda não tiver link
+        // Gerar link Jitsi se mudar para teleconsulta e ainda não tiver link
         if ($validated['type'] === 'teleconsulta' && !$consultation->location) {
             $roomName = 'makombe-' . $consultation->id . '-' . time();
             $validated['location'] = 'https://meet.jit.si/' . $roomName;
@@ -222,7 +235,8 @@ class ConsultationManageController extends Controller
             $validated['location'] = null;
         }
 
-        // 3. Atualizar dados
+        $validated['is_urgent'] = $request->has('is_urgent');
+
         $consultation->update($validated);
 
         return redirect()
@@ -231,7 +245,20 @@ class ConsultationManageController extends Controller
     }
 
     /**
-     * Marcar consulta como concluída
+     * Sugestão 8: Imprimir Nota Médica (Prescrição e Exames)
+     */
+    public function printMedicalNote($id)
+    {
+        $consultation = Consultation::with(['patient', 'doctor.specialty'])->findOrFail($id);
+
+        // Opcional: Verificar se a consulta já foi concluída ou se tem dados clínicos
+        // if (!$consultation->prescription && !$consultation->exams) { ... }
+
+        return view('admin.consultations.print-note', compact('consultation'));
+    }
+
+    /**
+     * Concluir consulta
      */
     public function complete($id)
     {
@@ -243,16 +270,18 @@ class ConsultationManageController extends Controller
 
         $consultation->update(['status' => 'concluida']);
 
-        try {
-            PatientActivityLog::log(
-                $consultation->patient_id,
-                'consulta_concluida',
-                "Consulta marcada como concluída",
-                ['consultation_id' => $consultation->id],
-                Auth::id()
-            );
-        } catch (\Exception $e) {
-            Log::warning('Erro ao registrar log: ' . $e->getMessage());
+        if (class_exists(PatientActivityLog::class)) {
+            try {
+                PatientActivityLog::log(
+                    $consultation->patient_id,
+                    'consulta_concluida',
+                    "Consulta concluída",
+                    ['consultation_id' => $consultation->id],
+                    Auth::id()
+                );
+            } catch (\Exception $e) {
+                Log::warning('Erro ao registrar log: ' . $e->getMessage());
+            }
         }
 
         return back()->with('success', '✅ Consulta marcada como concluída!');
@@ -271,16 +300,18 @@ class ConsultationManageController extends Controller
 
         $consultation->update(['status' => 'cancelada']);
 
-        try {
-            PatientActivityLog::log(
-                $consultation->patient_id,
-                'consulta_cancelada',
-                "Consulta cancelada pela gestão",
-                ['consultation_id' => $consultation->id],
-                Auth::id()
-            );
-        } catch (\Exception $e) {
-            Log::warning('Erro ao registrar log: ' . $e->getMessage());
+        if (class_exists(PatientActivityLog::class)) {
+            try {
+                PatientActivityLog::log(
+                    $consultation->patient_id,
+                    'consulta_cancelada',
+                    "Consulta cancelada pela gestão",
+                    ['consultation_id' => $consultation->id],
+                    Auth::id()
+                );
+            } catch (\Exception $e) {
+                Log::warning('Erro ao registrar log: ' . $e->getMessage());
+            }
         }
 
         return back()->with('success', '✅ Consulta cancelada com sucesso.');

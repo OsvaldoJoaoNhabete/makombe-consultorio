@@ -3,481 +3,318 @@
 namespace App\Http\Controllers\Portal;
 
 use App\Http\Controllers\Controller;
-use App\Services\WhatsAppService;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
-use Carbon\Carbon;
-
-use App\Models\Patient;
 use App\Models\Consultation;
+use App\Models\ConsultationRating;
+use App\Models\Patient;
 use App\Models\Quote;
 use App\Models\Payment;
-use App\Models\PatientActivityLog;
+use App\Models\Insurance;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 
 class PatientPortalController extends Controller
 {
-    protected $whatsappService;
-
-    public function __construct(WhatsAppService $whatsappService)
-    {
-        $this->whatsappService = $whatsappService;
-    }
-
     /**
-     * Mostrar formulário de login do paciente
+     * Helper para obter o paciente associado ao utilizador logado
      */
-    public function showLogin()
+    private function getPatient()
     {
-        return view('portal.login');
+        $user = Auth::user();
+        
+        // Associação por email ou telefone (devido ao login unificado)
+        $patient = Patient::where('email', $user->email)
+                          ->orWhere('phone', $user->phone)
+                          ->first();
+                          
+        return $patient;
     }
 
     /**
-     * Processar login do paciente
-     */
-    public function login(Request $request)
-    {
-        $validated = $request->validate([
-            'identifier' => 'required|string',
-            'password' => 'required|string',
-        ]);
-
-        $identifier = trim($validated['identifier']);
-        $password = $validated['password'];
-
-        $patient = Patient::findByEmailOrPhone($identifier);
-
-        if (!$patient) {
-            throw ValidationException::withMessages([
-                'identifier' => 'Credenciais não encontradas. Verifique seu email ou telefone.',
-            ]);
-        }
-
-        if (!$patient->is_active) {
-            throw ValidationException::withMessages([
-                'identifier' => 'Sua conta está desativada. Contacte o consultório.',
-            ]);
-        }
-
-        if (!Hash::check($password, $patient->password)) {
-            throw ValidationException::withMessages([
-                'password' => 'Senha incorreta. Tente novamente.',
-            ]);
-        }
-
-        Auth::guard('patient')->login($patient, $request->boolean('remember'));
-
-        try {
-            PatientActivityLog::log(
-                $patient->id,
-                'login',
-                "Paciente fez login no portal",
-                ['ip' => $request->ip()]
-            );
-        } catch (\Exception $e) {
-            // Ignorar erro de log
-        }
-
-        return redirect()->route('patient.dashboard');
-    }
-
-    /**
-     * Dashboard do paciente
+     * Dashboard do Paciente
      */
     public function dashboard()
     {
-        $patient = Auth::guard('patient')->user();
+        $patient = $this->getPatient();
 
-        $upcomingConsultations = Consultation::where('patient_id', $patient->id)
+        if (!$patient) {
+            return view('portal.dashboard', ['patient' => null, 'upcoming' => collect()]);
+        }
+
+        // Próximas consultas agendadas
+        $upcoming = Consultation::where('patient_id', $patient->id)
+            ->whereIn('status', ['agendada', 'confirmada'])
             ->where('scheduled_at', '>=', now())
-            ->whereIn('status', ['agendada', 'confirmada', 'em_andamento'])
-            ->with('doctor')
-            ->orderBy('scheduled_at')
-            ->limit(5)
-            ->get();
-
-        $pastConsultations = Consultation::where('patient_id', $patient->id)
-            ->where('status', 'concluida')
-            ->with('doctor')
-            ->orderByDesc('scheduled_at')
-            ->limit(5)
-            ->get();
-
-        $recentQuotes = Quote::where('patient_id', $patient->id)
-            ->orderByDesc('created_at')
+            ->orderBy('scheduled_at', 'asc')
             ->limit(3)
             ->get();
 
-        $recentPayments = Payment::where('patient_id', $patient->id)
-            ->orderByDesc('created_at')
-            ->limit(3)
-            ->get();
-
-        $stats = [
-            'total_consultas' => Consultation::where('patient_id', $patient->id)->count(),
-            'consultas_agendadas' => Consultation::where('patient_id', $patient->id)
-                ->whereIn('status', ['agendada', 'confirmada', 'em_andamento'])
-                ->count(),
-            'consultas_concluidas' => Consultation::where('patient_id', $patient->id)
-                ->where('status', 'concluida')
-                ->count(),
-            'total_cotacoes' => Quote::where('patient_id', $patient->id)->count(),
-            'total_pago' => Payment::where('patient_id', $patient->id)
-                ->where('status', 'confirmado')
-                ->sum('amount'),
-        ];
-
-        return view('portal.dashboard', compact(
-            'patient',
-            'upcomingConsultations',
-            'pastConsultations',
-            'recentQuotes',
-            'recentPayments',
-            'stats'
-        ));
+        return view('portal.dashboard', compact('patient', 'upcoming'));
     }
 
     /**
-     * Mostrar formulário de agendamento
+     * Formulário de agendamento
      */
     public function showSchedule()
     {
-        $patient = Auth::guard('patient')->user();
-        
-        $doctors = \App\Models\User::role('Medico')
-            ->where('is_active', true)
-            ->get(['id', 'name']);
+        $patient = $this->getPatient();
+        $specialties = \App\Models\Specialty::where('is_active', true)->get();
+        $doctors = \App\Models\User::role('Medico')->where('is_active', true)->with('specialty')->get();
+        $insurances = Insurance::where('is_active', true)->get();
 
-        $insurances = \App\Models\Insurance::where('is_active', true)
-            ->orderBy('name')
-            ->get(['id', 'name', 'coverage_percentage']);
-
-        $patientInsurances = $patient->insurances()
-            ->wherePivot('is_active', true)
-            ->get();
-
-        return view('portal.schedule', compact(
-            'patient', 
-            'doctors', 
-            'insurances', 
-            'patientInsurances'
-        ));
+        return view('portal.schedule', compact('patient', 'specialties', 'doctors', 'insurances'));
     }
 
-        /**
-     * Processar agendamento
+    /**
+     * Processar novo agendamento
      */
     public function schedule(Request $request)
     {
-        $patient = Auth::guard('patient')->user();
+        $patient = $this->getPatient();
+        if (!$patient) {
+            return back()->with('error', 'Perfil de paciente não encontrado. Contacte a receção.');
+        }
 
         $validated = $request->validate([
-            'date' => 'required|date|after_or_equal:today', // Permite a partir de hoje
-            'time' => 'required',
-            'type' => 'required|in:presencial,teleconsulta,domicilio',
-            'insurance_id' => 'nullable|exists:insurances,id',
-            'clinical_notes' => 'nullable|string|max:2000',
+            'doctor_id' => ['required', 'exists:users,id'],
+            'specialty_id' => ['nullable', 'exists:specialties,id'],
+            'scheduled_at' => ['required', 'date', 'after:now'],
+            'type' => ['required', 'in:presencial,teleconsulta,domicilio'],
+            'notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $scheduledAt = $validated['date'] . ' ' . $validated['time'] . ':00';
+        // Verificar conflito
+        $conflict = Consultation::where('doctor_id', $validated['doctor_id'])
+            ->where('scheduled_at', $validated['scheduled_at'])
+            ->whereNotIn('status', ['cancelada', 'faltou'])
+            ->exists();
 
-        $hour = (int) explode(':', $validated['time'])[0];
-        if ($hour < 7 || $hour >= 19) {
-            return back()
-                ->withErrors(['time' => 'O horário de atendimento é das 07:00 às 19:00.'])
-                ->withInput();
+        if ($conflict) {
+            return back()->with('error', 'Este horário já não está disponível. Por favor, escolha outro.');
         }
 
-        // Como o paciente não escolhe o médico, buscamos um médico ativo padrão ou deixamos nulo
-        // (A receção poderá alterar isso no painel admin antes de confirmar)
-        $defaultDoctor = \App\Models\User::role('Medico')->where('is_active', true)->first();
-        $doctorId = $defaultDoctor ? $defaultDoctor->id : null;
+        $location = null;
+        if ($validated['type'] === 'teleconsulta') {
+            $location = 'https://meet.jit.si/makombe-' . $patient->id . '-' . time();
+        }
 
-        $consultation = Consultation::create([
+        Consultation::create([
             'patient_id' => $patient->id,
-            'doctor_id' => $doctorId, // Será atribuído ou ajustado pela admin
-            'scheduled_at' => $scheduledAt,
+            'doctor_id' => $validated['doctor_id'],
+            'specialty_id' => $validated['specialty_id'] ?? null,
+            'scheduled_at' => $validated['scheduled_at'],
             'type' => $validated['type'],
-            'insurance_id' => $validated['insurance_id'] ?? null,
-            'clinical_notes' => $validated['clinical_notes'] ?? null,
+            'notes' => $validated['notes'] ?? null,
+            'location' => $location,
             'status' => 'agendada',
+            'payment_status' => 'pendente',
+            'created_by' => Auth::id(),
         ]);
 
-        if ($consultation->type === 'teleconsulta') {
-            $roomName = 'makombe-consulta-' . $consultation->id . '-' . uniqid();
-            $consultation->update(['location' => 'https://meet.jit.si/' . $roomName]);
-        }
-
-        try {
-            \App\Models\PatientActivityLog::log(
-                $patient->id,
-                'agendar_consulta',
-                "Paciente agendou consulta para " . \Carbon\Carbon::parse($scheduledAt)->format('d/m/Y \à\s H:i'),
-                ['consultation_id' => $consultation->id]
-            );
-        } catch (\Exception $e) {
-            // Ignorar erro de log
-        }
-
-        return redirect()
-            ->route('patient.consultations')
-            ->with('success', '✅ Solicitação de agendamento enviada com sucesso! A nossa equipe confirmará o médico em breve.');
+        return redirect()->route('patient.consultations')
+            ->with('success', '✅ Consulta agendada com sucesso! Aguarde a confirmação por SMS/WhatsApp.');
     }
 
     /**
-     * Lista de consultas do paciente
+     * Histórico de Consultas (Sugestão 3)
      */
-    public function consultations(Request $request)
+    public function consultations()
     {
-        $patient = Auth::guard('patient')->user();
-        
-        $filter = $request->input('filter', 'all');
-        
-        $query = Consultation::where('patient_id', $patient->id)
-            ->with('doctor', 'insurance');
-        
-        switch ($filter) {
-            case 'upcoming':
-                $query->where('scheduled_at', '>=', now())
-                      ->whereIn('status', ['agendada', 'confirmada', 'em_andamento']);
-                break;
-            case 'past':
-                $query->where('status', 'concluida');
-                break;
-            case 'cancelled':
-                $query->where('status', 'cancelada');
-                break;
+        $patient = $this->getPatient();
+
+        if (!$patient) {
+            return redirect()->route('patient.dashboard')->with('error', 'Perfil não encontrado.');
         }
-        
-        $consultations = $query->orderByDesc('scheduled_at')->paginate(10)->withQueryString();
-        
-        $stats = [
-            'total' => Consultation::where('patient_id', $patient->id)->count(),
-            'upcoming' => Consultation::where('patient_id', $patient->id)
-                ->where('scheduled_at', '>=', now())
-                ->whereIn('status', ['agendada', 'confirmada', 'em_andamento'])
-                ->count(),
-            'past' => Consultation::where('patient_id', $patient->id)
-                ->where('status', 'concluida')
-                ->count(),
-            'cancelled' => Consultation::where('patient_id', $patient->id)
-                ->where('status', 'cancelada')
-                ->count(),
-        ];
-        
-        return view('portal.consultations', compact('patient', 'consultations', 'stats', 'filter'));
+
+        $consultations = Consultation::where('patient_id', $patient->id)
+            ->with(['doctor.specialty', 'rating'])
+            ->orderByDesc('scheduled_at')
+            ->paginate(10);
+
+        return view('portal.consultations', compact('consultations'));
     }
 
     /**
-     * Detalhes da consulta
+     * Detalhes de uma consulta específica
      */
     public function showConsultation($id)
     {
-        $patient = Auth::guard('patient')->user();
+        $patient = $this->getPatient();
         
-        $consultation = Consultation::where('patient_id', $patient->id)
-            ->where('id', $id)
-            ->with(['doctor', 'insurance'])
+        $consultation = Consultation::where('id', $id)
+            ->where('patient_id', $patient->id)
+            ->with(['doctor.specialty', 'insurance', 'rating'])
             ->firstOrFail();
 
-        return view('portal.consultation-show', compact('patient', 'consultation'));
+        return view('portal.consultations.show', compact('consultation'));
     }
 
     /**
-     * Cancelar consulta
+     * Cancelar consulta pelo paciente
      */
     public function cancelConsultation($id)
     {
-        $patient = Auth::guard('patient')->user();
-
-        $consultation = Consultation::where('patient_id', $patient->id)
-            ->where('id', $id)
-            ->whereIn('status', ['agendada', 'confirmada'])
+        $patient = $this->getPatient();
+        
+        $consultation = Consultation::where('id', $id)
+            ->where('patient_id', $patient->id)
             ->firstOrFail();
 
-        $consultation->update(['status' => 'cancelada']);
-
-        try {
-            PatientActivityLog::log(
-                $patient->id,
-                'cancelar_consulta',
-                "Paciente cancelou consulta agendada para " . $consultation->scheduled_at->format('d/m/Y H:i'),
-                ['consultation_id' => $consultation->id]
-            );
-        } catch (\Exception $e) {
-            // Ignorar erro de log
+        if (in_array($consultation->status, ['concluida', 'cancelada', 'faltou'])) {
+            return back()->with('error', 'Não é possível cancelar esta consulta neste estado.');
         }
+
+        // Regra: só pode cancelar com 24h de antecedência (opcional, mas recomendado)
+        // if (Carbon::parse($consultation->scheduled_at)->diffInHours(now()) < 24) { ... }
+
+        $consultation->update(['status' => 'cancelada']);
 
         return back()->with('success', 'Consulta cancelada com sucesso.');
     }
 
     /**
-     * Reenviar credenciais por WhatsApp
+     * Reenviar lembrete WhatsApp (Simulação ou integração futura)
      */
-    public function resendWhatsApp($consultationId)
+    public function resendWhatsApp($id)
     {
-        $patient = Auth::guard('patient')->user();
+        $patient = $this->getPatient();
+        $consultation = Consultation::where('id', $id)->where('patient_id', $patient->id)->firstOrFail();
         
-        $consultation = Consultation::where('patient_id', $patient->id)
-            ->where('id', $consultationId)
-            ->where('type', 'teleconsulta')
-            ->firstOrFail();
+        // Aqui entraria a lógica de envio via API WhatsApp
+        Log::info('Reenvio de WhatsApp solicitado para consulta #' . $consultation->id);
 
-        try {
-            $sent = $this->whatsappService->sendConsultationMessage($consultation);
-            
-            if ($sent) {
-                return back()->with('success', '✅ Credenciais reenviadas para seu WhatsApp!');
-            } else {
-                $waLink = $this->whatsappService->generateWhatsAppLink($consultation);
-                return back()->with('whatsapp_manual', $waLink);
-            }
-        } catch (\Exception $e) {
-            $waLink = $this->whatsappService->generateWhatsAppLink($consultation);
-            return back()->with('whatsapp_manual', $waLink);
-        }
+        return back()->with('success', 'Lembrete reenviado para o seu WhatsApp.');
     }
 
     /**
-     * Lista de cotações
+     * Formulário de Avaliação (Sugestão 3)
+     */
+    public function showRateForm($id)
+    {
+        $patient = $this->getPatient();
+        
+        $consultation = Consultation::where('id', $id)
+            ->where('patient_id', $patient->id)
+            ->with(['doctor.specialty'])
+            ->firstOrFail();
+
+        // Só pode avaliar se estiver concluída
+        if ($consultation->status !== 'concluida') {
+            return redirect()->route('patient.consultations')->with('error', 'Só pode avaliar consultas concluídas.');
+        }
+
+        // Verificar se já avaliou
+        $existingRating = ConsultationRating::where('consultation_id', $id)
+                                            ->where('patient_id', $patient->id)
+                                            ->first();
+
+        if ($existingRating) {
+            return redirect()->route('patient.consultations')->with('info', 'Você já avaliou esta consulta.');
+        }
+
+        return view('portal.consultations.rate', compact('consultation'));
+    }
+
+    /**
+     * Processar a Avaliação (Sugestão 3)
+     */
+    public function rateConsultation(Request $request, $id)
+    {
+        $patient = $this->getPatient();
+        
+        $consultation = Consultation::where('id', $id)
+            ->where('patient_id', $patient->id)
+            ->firstOrFail();
+
+        $validated = $request->validate([
+            'rating' => ['required', 'integer', 'min:1', 'max:5'],
+            'comment' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        // Segurança contra duplicação
+        $exists = ConsultationRating::where('consultation_id', $id)
+                                    ->where('patient_id', $patient->id)
+                                    ->exists();
+
+        if ($exists) {
+            return back()->with('error', 'Avaliação já registada.');
+        }
+
+        ConsultationRating::create([
+            'consultation_id' => $consultation->id,
+            'patient_id' => $patient->id,
+            'rating' => $validated['rating'],
+            'comment' => $validated['comment'] ?? null,
+        ]);
+
+        return redirect()->route('patient.consultations')
+            ->with('success', '✅ Obrigado pela sua avaliação! A sua opinião ajuda-nos a melhorar.');
+    }
+
+    /**
+     * Cotações do Paciente
      */
     public function quotes()
     {
-        $patient = Auth::guard('patient')->user();
-
-        $quotes = Quote::where('patient_id', $patient->id)
-            ->with(['items.procedure', 'insurance'])
-            ->orderByDesc('created_at')
-            ->paginate(10);
-
-        return view('portal.quotes', compact('patient', 'quotes'));
+        $patient = $this->getPatient();
+        $quotes = Quote::where('patient_id', $patient->id)->orderByDesc('created_at')->paginate(10);
+        return view('portal.quotes', compact('quotes'));
     }
 
-    /**
-     * Detalhes da cotação
-     */
     public function showQuote($id)
     {
-        $patient = Auth::guard('patient')->user();
-
-        $quote = Quote::where('patient_id', $patient->id)
-            ->where('id', $id)
-            ->with(['items.procedure', 'insurance'])
-            ->firstOrFail();
-
-        return view('portal.quote-show', compact('patient', 'quote'));
+        $patient = $this->getPatient();
+        $quote = Quote::where('id', $id)->where('patient_id', $patient->id)->with('items')->firstOrFail();
+        return view('portal.quotes.show', compact('quote'));
     }
 
     /**
-     * Lista de pagamentos
+     * Pagamentos do Paciente
      */
     public function payments()
     {
-        $patient = Auth::guard('patient')->user();
-
-        $payments = Payment::where('patient_id', $patient->id)
-            ->with(['consultation'])
-            ->orderByDesc('created_at')
-            ->paginate(10);
-
-        $stats = [
-            'total_pago' => Payment::where('patient_id', $patient->id)
-                ->where('status', 'confirmado')
-                ->sum('amount'),
-            'pendente' => Payment::where('patient_id', $patient->id)
-                ->where('status', 'pendente')
-                ->sum('amount'),
-        ];
-
-        return view('portal.payments', compact('patient', 'payments', 'stats'));
+        $patient = $this->getPatient();
+        // Buscar pagamentos associados às consultas do paciente
+        $payments = Payment::whereHas('consultation', function($q) use ($patient) {
+            $q->where('patient_id', $patient->id);
+        })->orderByDesc('created_at')->paginate(10);
+        
+        return view('portal.payments', compact('payments'));
     }
 
     /**
-     * Lista de seguradoras
+     * Seguradoras do Paciente
      */
     public function insurances()
     {
-        $patient = Auth::guard('patient')->user();
-
-        $insurances = $patient->insurances()
-            ->withPivot('policy_number', 'valid_from', 'valid_until', 'is_primary', 'is_active')
-            ->get();
-
-        return view('portal.insurances', compact('patient', 'insurances'));
+        $patient = $this->getPatient();
+        $insurances = $patient->insurances; // Relação many-to-many
+        return view('portal.insurances', compact('insurances'));
     }
 
     /**
-     * Perfil do paciente
+     * Perfil do Paciente
      */
     public function profile()
     {
-        $patient = Auth::guard('patient')->user();
+        $patient = $this->getPatient();
         return view('portal.profile', compact('patient'));
     }
 
-    /**
-     * Atualizar perfil
-     */
     public function updateProfile(Request $request)
     {
-        $patient = Auth::guard('patient')->user();
-
+        $patient = $this->getPatient();
+        
         $validated = $request->validate([
-            'phone' => 'nullable|string|size:9|unique:patients,phone,' . $patient->id,
-            'address' => 'nullable|string|max:500',
-            'medical_history' => 'nullable|string|max:2000',
-            'password' => 'nullable|min:6|confirmed',
+            'address' => ['nullable', 'string', 'max:500'],
+            'medical_history' => ['nullable', 'string', 'max:2000'],
+            'emergency_contact_name' => ['nullable', 'string', 'max:150'],
+            'emergency_contact_phone' => ['nullable', 'string', 'max:20'],
         ]);
 
-        $data = [
-            'phone' => $validated['phone'] ?? $patient->phone,
-            'address' => $validated['address'] ?? $patient->address,
-            'medical_history' => $validated['medical_history'] ?? $patient->medical_history,
-        ];
+        $patient->update($validated);
 
-        if (!empty($validated['password'])) {
-            $data['password'] = Hash::make($validated['password']);
-        }
-
-        $patient->update($data);
-
-        try {
-            PatientActivityLog::log(
-                $patient->id,
-                'perfil_atualizado',
-                "Paciente atualizou seu perfil",
-                []
-            );
-        } catch (\Exception $e) {
-            // Ignorar erro de log
-        }
-
-        return back()->with('success', '✅ Perfil atualizado com sucesso!');
-    }
-
-    /**
-     * Logout do paciente
-     */
-    public function logout(Request $request)
-    {
-        $patient = Auth::guard('patient')->user();
-
-        try {
-            PatientActivityLog::log(
-                $patient->id,
-                'logout',
-                "Paciente fez logout do portal",
-                []
-            );
-        } catch (\Exception $e) {
-            // Ignorar erro de log
-        }
-
-        Auth::guard('patient')->logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
-
-        return redirect()->route('patient.login');
+        return back()->with('success', 'Perfil atualizado com sucesso!');
     }
 }

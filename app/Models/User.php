@@ -12,69 +12,49 @@ class User extends Authenticatable
 {
     use HasFactory, Notifiable, SoftDeletes, HasRoles;
 
-    /**
-     * Os atributos que podem ser preenchidos em massa.
-     *
-     * @var array<int, string>
-     */
     protected $fillable = [
         'name',
         'email',
-        'password',
         'phone',
-        'specialty_id',
+        'password',
+        'type',
         'is_active',
+        'specialty_id',
         'photo',
-        'must_change_password', // IMPORTANTE: Adicionar aqui
+        'must_change_password',
     ];
 
-    /**
-     * Os atributos que devem ser ocultados na serialização.
-     *
-     * @var array<int, string>
-     */
     protected $hidden = [
         'password',
         'remember_token',
     ];
 
-    /**
-     * Os atributos que devem ser convertidos para tipos nativos.
-     *
-     * @var array<string, string>
-     */
     protected $casts = [
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
         'is_active' => 'boolean',
-        'must_change_password' => 'boolean', // IMPORTANTE: Cast para boolean
+        'must_change_password' => 'boolean',
     ];
 
-    /**
-     * Relação com a Especialidade.
-     */
+    // Relação com Especialidade
     public function specialty()
     {
         return $this->belongsTo(Specialty::class, 'specialty_id');
     }
 
-    // NOVA RELAÇÃO: Disponibilidades
+    // Relação com Disponibilidades
     public function availabilities()
     {
         return $this->hasMany(ProfessionalAvailability::class, 'user_id');
     }
 
-    /**
-     * Verifica se o utilizador tem uma foto de perfil.
-     */
+    // Verificar se tem foto
     public function hasPhoto(): bool
     {
         return !empty($this->photo);
     }
 
-    /**
-     * Obtém o URL da foto de perfil.
-     */
+    // Obter URL da foto
     public function getPhotoUrl(): string
     {
         if ($this->hasPhoto()) {
@@ -82,5 +62,17 @@ class User extends Authenticatable
         }
         
         return 'https://ui-avatars.com/api/?name=' . urlencode($this->name) . '&color=FFFFFF&background=6d28d9&size=128&font-size=0.4';
+    }
+
+    // Verificar se é paciente
+    public function isPatient(): bool
+    {
+        return $this->type === 'patient';
+    }
+
+    // Verificar se é staff
+    public function isStaff(): bool
+    {
+        return $this->type === 'staff';
     }
 }

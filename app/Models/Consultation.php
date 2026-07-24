@@ -40,6 +40,7 @@ class Consultation extends Model
         'rating',
         'review_comment',
         'reviewed_at',
+        'rating',
     ];
 
     protected $casts = [
@@ -170,5 +171,10 @@ class Consultation extends Model
         $this->update([
             'video_call_ended_at' => now()
         ]);
+    }
+
+    public function rating()
+    {
+        return $this->hasOne(ConsultationRating::class, 'consultation_id');
     }
 }

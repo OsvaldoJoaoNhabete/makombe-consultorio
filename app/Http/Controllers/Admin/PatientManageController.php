@@ -14,22 +14,28 @@ use Illuminate\Validation\Rules\Password;
 class PatientManageController extends Controller
 {
     /**
-     * Lista de pacientes com filtros
+     * Lista de pacientes com filtros e RESTRIÇÃO DE PRIVACIDADE
      */
     public function index(Request $request)
     {
         $search = $request->input('search');
         $status = $request->input('status', 'all');
-        $gender = $request->input('gender', 'all');
+        $user = Auth::user();
 
         $query = Patient::query();
+
+        // SUGESTÃO 9: Médico/Enfermeiro só vê pacientes que já atendeu
+        if ($user->hasRole('Medico|Enfermeiro')) {
+            $query->whereHas('consultations', function ($q) use ($user) {
+                $q->where('doctor_id', $user->id);
+            });
+        }
 
         if ($search) {
             $query->where(function($q) use ($search) {
                 $q->where('full_name', 'LIKE', "%{$search}%")
                   ->orWhere('nid', 'LIKE', "%{$search}%")
-                  ->orWhere('phone', 'LIKE', "%{$search}%")
-                  ->orWhere('email', 'LIKE', "%{$search}%");
+                  ->orWhere('phone', 'LIKE', "%{$search}%");
             });
         }
 
@@ -37,10 +43,6 @@ class PatientManageController extends Controller
             $query->where('is_active', true);
         } elseif ($status === 'inactive') {
             $query->where('is_active', false);
-        }
-
-        if ($gender !== 'all') {
-            $query->where('gender', $gender);
         }
 
         $patients = $query->orderByDesc('created_at')->paginate(15)->withQueryString();
@@ -52,7 +54,7 @@ class PatientManageController extends Controller
             'hoje' => Patient::whereDate('created_at', today())->count(),
         ];
 
-        return view('admin.patients.index', compact('patients', 'stats', 'search', 'status', 'gender'));
+        return view('admin.patients.index', compact('patients', 'stats', 'search', 'status'));
     }
 
     /**
@@ -206,20 +208,43 @@ class PatientManageController extends Controller
         return redirect()->route('patients.show', $patient->id)
             ->with('success', '✅ Paciente atualizado com sucesso!');
     }
-    /**
-     * Detalhes do paciente
+     /**
+     * Detalhes do paciente (com proteção de dados de contacto)
      */
     public function show($id)
     {
-        $patient = Patient::with(['consultations', 'insurances'])->findOrFail($id);
+        $patient = Patient::with(['consultations.doctor', 'insurances'])->findOrFail($id);
+        $user = Auth::user();
+
+        // SUGESTÃO 9: Verificar se o médico/enfermeiro tem permissão para ver este paciente
+        if ($user->hasRole('Medico|Enfermeiro')) {
+            $hasAttended = $patient->consultations()->where('doctor_id', $user->id)->exists();
+            if (!$hasAttended) {
+                abort(403, 'Você não tem permissão para visualizar este paciente.');
+            }
+        }
+
+        // SUGESTÃO 10: Mascarar dados de contacto para Médicos/Enfermeiros
+        $isRestricted = $user->hasRole('Medico|Enfermeiro');
         
+        if ($isRestricted) {
+            // Mascarar telefone: 841234567 -> 841***567
+            if ($patient->phone) {
+                $patient->phone = substr($patient->phone, 0, 3) . '***' . substr($patient->phone, -3);
+            }
+            $patient->email = '***@***.com';
+            $patient->address = 'Dados protegidos por privacidade';
+            $patient->emergency_contact_name = 'Protegido';
+            $patient->emergency_contact_phone = 'Protegido';
+        }
+
         $recentConsultations = $patient->consultations()
             ->with('doctor')
             ->orderByDesc('scheduled_at')
             ->limit(5)
             ->get();
 
-        return view('admin.patients.show', compact('patient', 'recentConsultations'));
+        return view('admin.patients.show', compact('patient', 'recentConsultations', 'isRestricted'));
     }
 
     /**

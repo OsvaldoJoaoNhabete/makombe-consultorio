@@ -14,9 +14,25 @@ return new class extends Migration
         Schema::create('users', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('email')->unique();
+            
+            // Email torna-se opcional (nullable) para permitir login apenas com telefone
+            $table->string('email')->unique()->nullable();
             $table->timestamp('email_verified_at')->nullable();
+            
+            // Telefone único para permitir login via celular
+            $table->string('phone')->unique()->nullable();
+            
             $table->string('password');
+            
+            // Tipo de usuário: 'staff' (funcionários) ou 'patient' (pacientes)
+            $table->enum('type', ['staff', 'patient'])->default('staff');
+            
+            // Estado da conta (ativa/inativa)
+            $table->boolean('is_active')->default(true);
+            
+            // Soft deletes para não perder dados históricos
+            $table->softDeletes();
+            
             $table->rememberToken();
             $table->timestamps();
         });

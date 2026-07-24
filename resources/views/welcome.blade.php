@@ -88,11 +88,9 @@
 
                 <!-- Botões de Ação -->
                 <div class="hidden lg:flex items-center gap-3">
-                    <a href="{{ route('patient.login') }}" class="px-5 py-2.5 border-2 border-makombe-600 text-makombe-700 hover:bg-makombe-50 font-bold rounded-xl transition text-sm">
-                        <i class="fas fa-user mr-1"></i> Portal
-                    </a>
+                  
                     <a href="{{ route('login') }}" class="px-5 py-2.5 bg-makombe-700 hover:bg-makombe-800 text-white font-bold rounded-xl transition text-sm shadow-lg shadow-makombe-500/30">
-                        <i class="fas fa-user-shield mr-1"></i> Staff
+                        <i class="fas fa-user-shield mr-1"></i> Entrar
                     </a>
                 </div>
 
@@ -117,7 +115,7 @@
             <a href="#equipa" class="block py-3 px-4 text-slate-700 hover:bg-makombe-50 hover:text-makombe-700 rounded-lg font-semibold transition mobile-link">Equipa</a>
             <a href="#contactos" class="block py-3 px-4 text-slate-700 hover:bg-makombe-50 hover:text-makombe-700 rounded-lg font-semibold transition mobile-link">Contactos</a>
             <hr class="border-slate-100 my-4">
-            <a href="{{ route('patient.login') }}" class="block w-full py-3 px-4 border-2 border-makombe-600 text-makombe-700 text-center rounded-xl font-bold transition mobile-link">Portal do Paciente</a>
+            <a href="{{ route('login') }}" class="block w-full py-3 px-4 border-2 border-makombe-600 text-makombe-700 text-center rounded-xl font-bold transition mobile-link">Portal do Paciente</a>
             <a href="{{ route('login') }}" class="block w-full py-3 px-4 bg-makombe-700 text-white text-center rounded-xl font-bold transition mobile-link">Área Staff</a>
         </nav>
     </div>
@@ -152,14 +150,22 @@
                     </p>
 
                     <div class="flex flex-col sm:flex-row gap-4">
-                        <a href="{{ route('patient.register') }}" class="px-8 py-4 bg-white text-makombe-800 hover:bg-slate-100 font-black rounded-xl shadow-xl transition transform hover:scale-105 flex items-center justify-center gap-2 text-lg">
+                        <a href="{{ route('register') }}" class="px-8 py-4 bg-white text-makombe-800 hover:bg-slate-100 font-black rounded-xl shadow-xl transition transform hover:scale-105 flex items-center justify-center gap-2 text-lg">
                             <i class="fas fa-user-plus"></i>
                             <span>Criar Conta Grátis</span>
                         </a>
-                        <a href="https://wa.me/{{ $settings['whatsapp_number'] ?? '258841234567' }}" target="_blank" class="px-8 py-4 border-2 border-white text-white hover:bg-white hover:text-makombe-800 font-black rounded-xl transition flex items-center justify-center gap-2 text-lg">
-                            <i class="fab fa-whatsapp"></i>
-                            <span>Falar no WhatsApp</span>
-                        </a>
+                        <!-- Botão Flutuante WhatsApp (Sugestão 12) -->
+<a href="https://wa.me/258841178857?text=Olá,%20gostaria%20de%20mais%20informações%20sobre%20o%20Makombe%20Consultório." 
+   target="_blank" 
+   rel="noopener noreferrer"
+   class="fixed bottom-6 right-6 z-50 bg-[#25D366] hover:bg-[#20bd5a] text-white w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 hover:scale-110 group animate-pulse"
+   title="Fale connosco no WhatsApp">
+    <i class="fab fa-whatsapp text-3xl"></i>
+    <!-- Tooltip ao passar o rato -->
+    <span class="absolute right-full mr-3 bg-gray-800 text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-lg pointer-events-none">
+        Fale connosco (84 117 88 57)
+    </span>
+</a>
                     </div>
 
                     <!-- Stats -->
@@ -207,7 +213,7 @@
                             </div>
                         </div>
 
-                        <a href="{{ route('patient.register') }}" class="block w-full py-4 bg-makombe-700 hover:bg-makombe-800 text-white text-center font-black rounded-xl shadow-lg transition">
+                        <a href="{{ route('register') }}" class="block w-full py-4 bg-makombe-700 hover:bg-makombe-800 text-white text-center font-black rounded-xl shadow-lg transition">
                             Começar Agora <i class="fas fa-arrow-right ml-2"></i>
                         </a>
                     </div>
@@ -242,7 +248,7 @@
                             </div>
                             <h3 class="text-xl font-black text-slate-900 mb-3">{{ $service->title }}</h3>
                             <p class="text-slate-600 mb-6 leading-relaxed">{{ $service->description }}</p>
-                            <a href="{{ route('patient.register') }}" class="inline-flex items-center gap-2 text-makombe-700 font-bold hover:text-makombe-900 transition group/link">
+                            <a href="{{ route('register') }}" class="inline-flex items-center gap-2 text-makombe-700 font-bold hover:text-makombe-900 transition group/link">
                                 Agendar agora <i class="fas fa-arrow-right text-sm transform group-hover/link:translate-x-1 transition-transform"></i>
                             </a>
                         </div>
@@ -503,15 +509,23 @@
                 Crie sua conta grátis e tenha acesso a consultas, teleconsultas, histórico médico e muito mais.
             </p>
             <div class="flex flex-col sm:flex-row gap-4 justify-center">
-                <a href="{{ route('patient.register') }}" class="px-8 py-4 bg-white text-makombe-800 hover:bg-slate-100 font-black rounded-xl shadow-xl transition flex items-center justify-center gap-2 text-lg transform hover:scale-105">
+                <a href="{{ route('register') }}" class="px-8 py-4 bg-white text-makombe-800 hover:bg-slate-100 font-black rounded-xl shadow-xl transition flex items-center justify-center gap-2 text-lg transform hover:scale-105">
                     <i class="fas fa-user-plus"></i>
                     <span>Criar Conta Grátis</span>
                 </a>
                 @if(!empty($settings['whatsapp_number']))
-                    <a href="https://wa.me/{{ $settings['whatsapp_number'] }}" target="_blank" class="px-8 py-4 border-2 border-white text-white hover:bg-white hover:text-makombe-800 font-black rounded-xl transition flex items-center justify-center gap-2 text-lg">
-                        <i class="fab fa-whatsapp"></i>
-                        <span>Falar no WhatsApp</span>
-                    </a>
+                    <!-- Botão Flutuante WhatsApp (Sugestão 12) -->
+<a href="https://wa.me/258841178857?text=Olá,%20gostaria%20de%20mais%20informações%20sobre%20o%20Makombe%20Consultório." 
+   target="_blank" 
+   rel="noopener noreferrer"
+   class="fixed bottom-6 right-6 z-50 bg-[#25D366] hover:bg-[#20bd5a] text-white w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 hover:scale-110 group animate-pulse"
+   title="Fale connosco no WhatsApp">
+    <i class="fab fa-whatsapp text-3xl"></i>
+    <!-- Tooltip ao passar o rato -->
+    <span class="absolute right-full mr-3 bg-gray-800 text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-lg pointer-events-none">
+        Fale connosco (84 117 88 57)
+    </span>
+</a>
                 @endif
             </div>
         </div>
@@ -550,7 +564,18 @@
                             <a href="{{ $settings['instagram_url'] }}" target="_blank" class="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-lg flex items-center justify-center transition"><i class="fab fa-instagram"></i></a>
                         @endif
                         @if(!empty($settings['whatsapp_number']))
-                            <a href="https://wa.me/{{ $settings['whatsapp_number'] }}" target="_blank" class="w-10 h-10 bg-white/10 hover:bg-white/20 rounded-lg flex items-center justify-center transition"><i class="fab fa-whatsapp"></i></a>
+                            <!-- Botão Flutuante WhatsApp (Sugestão 12) -->
+<a href="https://wa.me/258841178857?text=Olá,%20gostaria%20de%20mais%20informações%20sobre%20o%20Makombe%20Consultório." 
+   target="_blank" 
+   rel="noopener noreferrer"
+   class="fixed bottom-6 right-6 z-50 bg-[#25D366] hover:bg-[#20bd5a] text-white w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 hover:scale-110 group animate-pulse"
+   title="Fale connosco no WhatsApp">
+    <i class="fab fa-whatsapp text-3xl"></i>
+    <!-- Tooltip ao passar o rato -->
+    <span class="absolute right-full mr-3 bg-gray-800 text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-lg pointer-events-none">
+        Fale connosco (84 117 88 57)
+    </span>
+</a>
                         @endif
                     </div>
                 </div>
@@ -613,9 +638,9 @@
                     © {{ date('Y') }} {{ $settings['site_name'] ?? 'Makombe Consultório Médico' }}. Todos os direitos reservados.
                 </p>
                 <div class="flex items-center gap-4 text-sm">
-                    <a href="{{ route('patient.terms') }}" class="text-makombe-200 hover:text-white transition">Termos e Condições</a>
+                    <a href="{{ route('terms') }}" class="text-makombe-200 hover:text-white transition">Termos e Condições</a>
                     <span class="text-makombe-400">•</span>
-                    <a href="{{ route('patient.privacy') }}" class="text-makombe-200 hover:text-white transition">Política de Privacidade</a>
+                    <a href="{{ route('privacy') }}" class="text-makombe-200 hover:text-white transition">Política de Privacidade</a>
                 </div>
             </div>
         </div>
@@ -623,10 +648,18 @@
 
     <!-- Botão Flutuante WhatsApp -->
     @if(!empty($settings['whatsapp_number']))
-        <a href="https://wa.me/{{ $settings['whatsapp_number'] }}" target="_blank" 
-           class="fixed bottom-6 right-6 w-16 h-16 bg-green-500 hover:bg-green-600 text-white rounded-full flex items-center justify-center shadow-2xl transition transform hover:scale-110 z-50 animate-bounce">
-            <i class="fab fa-whatsapp text-3xl"></i>
-        </a>
+        <!-- Botão Flutuante WhatsApp (Sugestão 12) -->
+<a href="https://wa.me/258841178857?text=Olá,%20gostaria%20de%20mais%20informações%20sobre%20o%20Makombe%20Consultório." 
+   target="_blank" 
+   rel="noopener noreferrer"
+   class="fixed bottom-6 right-6 z-50 bg-[#25D366] hover:bg-[#20bd5a] text-white w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 hover:scale-110 group animate-pulse"
+   title="Fale connosco no WhatsApp">
+    <i class="fab fa-whatsapp text-3xl"></i>
+    <!-- Tooltip ao passar o rato -->
+    <span class="absolute right-full mr-3 bg-gray-800 text-white text-xs px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap shadow-lg pointer-events-none">
+        Fale connosco (84 117 88 57)
+    </span>
+</a>
     @endif
 
     <!-- ============================================ -->

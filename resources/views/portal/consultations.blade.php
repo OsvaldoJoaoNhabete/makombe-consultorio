@@ -1,215 +1,104 @@
-<!DOCTYPE html>
-<html lang="pt-MZ">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Minhas Consultas • Portal do Paciente - Makombe</title>
-    
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <style>
-    body { font-family: 'Lato', sans-serif; }
-    
-    .sidebar { 
-        position: fixed; top: 0; left: 0; height: 100vh; width: 270px; 
-        background: linear-gradient(180deg, #4c1d95 0%, #5b21b6 50%, #6d28d9 100%); 
-        display: flex; flex-direction: column; z-index: 50; 
-        transition: transform 0.3s ease;
-    }
-    
-    .nav-item { 
-        display: flex; align-items: center; padding: 0.85rem 1.5rem; 
-        color: #ddd6fe; text-decoration: none; transition: all 0.2s ease; 
-        font-size: 0.95rem; font-weight: 500; border-left: 4px solid transparent; 
-    }
-    .nav-item:hover { 
-        background-color: rgba(255, 255, 255, 0.1); 
-        color: #ffffff; 
-        border-left-color: #a78bfa;
-    }
-    .nav-item.active { 
-        background-color: rgba(255, 255, 255, 0.15); 
-        color: #ffffff; 
-        border-left-color: #ffffff;
-        font-weight: 700;
-    }
-    .nav-item i { width: 24px; text-align: center; margin-right: 12px; font-size: 1.1rem; }
-    
-    .main-content { margin-left: 270px; min-height: 100vh; background-color: #f8fafc; }
-    
-    @media (max-width: 768px) { 
-        .sidebar { transform: translateX(-100%); } 
-        .sidebar.open { transform: translateX(0); } 
-        .main-content { margin-left: 0; } 
-    }
-</style>
-</head>
-<body class="bg-gray-50">
+<x-layouts.patient title="Minhas Consultas">
+    <!-- Nota: Assumindo que você tem um layout base para o paciente chamado layouts.patient ou pode usar layouts.admin adaptado -->
 
-    <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden md:hidden" onclick="toggleSidebar()"></div>
-
-    <x-portal-sidebar />
-
-    <div class="main-content">
-        <header class="bg-white border-b border-gray-200 px-6 py-4">
-            <div class="flex items-center justify-between">
-                <button class="md:hidden text-gray-600" onclick="toggleSidebar()"><i class="fas fa-bars text-xl"></i></button>
-                <h2 class="text-xl font-bold text-gray-800">Minhas Consultas</h2>
-                <a href="{{ route('patient.schedule') }}" class="hidden md:inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm">
-                    <i class="fas fa-plus"></i> Nova Consulta
-                </a>
-            </div>
-        </header>
-
-        <main class="p-6">
-            @if(session('success'))
-                <div class="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl text-green-800 flex items-center gap-3">
-                    <i class="fas fa-check-circle"></i> {{ session('success') }}
-                </div>
-            @endif
-
-            <div class="mb-6">
-                <h1 class="text-3xl font-bold text-gray-900 mb-2">📅 Minhas Consultas</h1>
-                <p class="text-gray-600">Acompanhe todas as suas consultas médicas.</p>
-            </div>
-
-            <!-- Filtros -->
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <a href="{{ route('patient.consultations', ['filter' => 'all']) }}" class="bg-white p-4 rounded-xl shadow-sm border hover:shadow-md transition {{ $filter === 'all' ? 'ring-2 ring-emerald-500' : '' }}">
-                    <p class="text-xs text-gray-500 uppercase font-semibold">Total</p>
-                    <p class="text-2xl font-bold text-gray-900 mt-1">{{ $stats['total'] }}</p>
-                </a>
-                <a href="{{ route('patient.consultations', ['filter' => 'upcoming']) }}" class="bg-white p-4 rounded-xl shadow-sm border hover:shadow-md transition {{ $filter === 'upcoming' ? 'ring-2 ring-blue-500' : '' }}">
-                    <p class="text-xs text-blue-600 uppercase font-semibold">Próximas</p>
-                    <p class="text-2xl font-bold text-blue-700 mt-1">{{ $stats['upcoming'] }}</p>
-                </a>
-                <a href="{{ route('patient.consultations', ['filter' => 'past']) }}" class="bg-white p-4 rounded-xl shadow-sm border hover:shadow-md transition {{ $filter === 'past' ? 'ring-2 ring-green-500' : '' }}">
-                    <p class="text-xs text-green-600 uppercase font-semibold">Concluídas</p>
-                    <p class="text-2xl font-bold text-green-700 mt-1">{{ $stats['past'] }}</p>
-                </a>
-                <a href="{{ route('patient.consultations', ['filter' => 'cancelled']) }}" class="bg-white p-4 rounded-xl shadow-sm border hover:shadow-md transition {{ $filter === 'cancelled' ? 'ring-2 ring-red-500' : '' }}">
-                    <p class="text-xs text-red-600 uppercase font-semibold">Canceladas</p>
-                    <p class="text-2xl font-bold text-red-700 mt-1">{{ $stats['cancelled'] }}</p>
-                </a>
-            </div>
-
-            <!-- Lista -->
-            <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
-                @if($consultations->count() > 0)
-                    <div class="divide-y divide-gray-100">
-                        @foreach($consultations as $consultation)
-                            @php
-                                $statusClass = match($consultation->status) {
-                                    'agendada' => 'bg-blue-100 text-blue-800',
-                                    'confirmada' => 'bg-indigo-100 text-indigo-800',
-                                    'em_andamento' => 'bg-amber-100 text-amber-800',
-                                    'concluida' => 'bg-green-100 text-green-800',
-                                    'cancelada' => 'bg-red-100 text-red-800',
-                                    default => 'bg-gray-100 text-gray-800',
-                                };
-                            @endphp
-                            <div class="p-5 hover:bg-gray-50 transition">
-                                <div class="flex flex-col md:flex-row md:items-start gap-4">
-                                    <div class="flex-shrink-0">
-                                        <div class="w-14 h-14 rounded-xl flex items-center justify-center text-3xl
-                                            {{ $consultation->type === 'teleconsulta' ? 'bg-purple-100' : ($consultation->type === 'domicilio' ? 'bg-amber-100' : 'bg-blue-100') }}">
-                                            {{ $consultation->type === 'presencial' ? '🏥' : ($consultation->type === 'teleconsulta' ? '💻' : '') }}
-                                        </div>
-                                    </div>
-                                    <div class="flex-1 min-w-0">
-                                        <div class="flex items-start justify-between flex-wrap gap-2 mb-2">
-                                            <div>
-                                                <h3 class="font-bold text-gray-900 text-lg">
-                                                    {{ $consultation->scheduled_at->format('d/m/Y \à\s H:i') }}
-                                                </h3>
-                                                <p class="text-sm text-gray-600 mt-1">
-                                                    <i class="fas fa-user-md text-emerald-600 mr-1"></i>
-                                                    <strong>{{ $consultation->doctor->name ?? 'Médico' }}</strong>
-                                                </p>
-                                            </div>
-                                            <span class="px-3 py-1 text-xs font-semibold rounded-full {{ $statusClass }}">
-                                                {{ ucfirst(str_replace('_', ' ', $consultation->status)) }}
-                                            </span>
-                                        </div>
-
-                                        <p class="text-sm text-gray-600">
-                                            {{ ucfirst($consultation->type) }}
-                                            @if($consultation->insurance)
-                                                • {{ $consultation->insurance->name }}
-                                            @endif
-                                        </p>
-
-                                        @if($consultation->clinical_notes)
-                                            <div class="mt-2 p-2 bg-gray-50 border border-gray-200 rounded-lg">
-                                                <p class="text-xs text-gray-600"><strong>Queixa:</strong> {{ $consultation->clinical_notes }}</p>
-                                            </div>
-                                        @endif
-
-                                        <!-- Botões de Ação -->
-                                        <div class="mt-3 flex flex-wrap gap-2">
-                                            @if($consultation->type === 'teleconsulta')
-                                                @if($consultation->isVideoCallActive())
-                                                    <a href="{{ $consultation->location }}" target="_blank"
-                                                       class="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-lg">
-                                                        <i class="fas fa-video"></i> Entrar na Videochamada
-                                                    </a>
-                                                @else
-                                                    <a href="{{ route('patient.consultations.show', $consultation->id) }}"
-                                                       class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg">
-                                                        <i class="fas fa-info-circle"></i> Ver Credenciais
-                                                    </a>
-                                                @endif
-                                            @endif
-
-                                            @if(in_array($consultation->status, ['agendada', 'confirmada']))
-                                                <form method="POST" action="{{ route('patient.consultations.cancel', $consultation->id) }}" 
-                                                      onsubmit="return confirm('Tem certeza que deseja cancelar esta consulta?');"
-                                                      class="inline">
-                                                    @csrf
-                                                    <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-semibold rounded-lg">
-                                                        <i class="fas fa-times"></i> Cancelar
-                                                    </button>
-                                                </form>
-                                            @endif
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-
-                    @if($consultations->hasPages())
-                        <div class="px-6 py-4 border-t bg-gray-50">
-                            {{ $consultations->links() }}
-                        </div>
-                    @endif
-                @else
-                    <div class="p-12 text-center">
-                        <i class="fas fa-calendar-check text-6xl text-gray-300 mb-4"></i>
-                        <h4 class="text-lg font-semibold text-gray-700 mb-2">Nenhuma consulta encontrada</h4>
-                        <p class="text-gray-500 mb-4">
-                            @if($filter === 'upcoming')
-                                Agende uma nova consulta para começar.
-                            @else
-                                Não há consultas para este filtro.
-                            @endif
-                        </p>
-                        <a href="{{ route('patient.schedule') }}" class="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl">
-                            <i class="fas fa-calendar-plus"></i> Agendar Consulta
-                        </a>
-                    </div>
-                @endif
-            </div>
-        </main>
+    <div class="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">Minhas Consultas</h1>
+            <p class="text-gray-600">Histórico e acompanhamento dos seus atendimentos</p>
+        </div>
+        <a href="{{ route('patient.schedule') }}" class="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl shadow-lg transition">
+            <i class="fas fa-plus"></i> Marcar Nova Consulta
+        </a>
     </div>
 
-    <script>
-        function toggleSidebar() {
-            document.getElementById('sidebar').classList.toggle('open');
-            document.getElementById('sidebar-overlay').classList.toggle('hidden');
-        }
-    </script>
-</body>
-</html>
+    @if (session('success'))
+        <div class="mb-6 bg-green-50 border-l-4 border-green-500 p-4 rounded-r-lg shadow-sm">
+            <p class="text-sm text-green-700 font-medium"><i class="fas fa-check-circle mr-2"></i>{{ session('success') }}</p>
+        </div>
+    @endif
+
+    @if (session('error'))
+        <div class="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg shadow-sm">
+            <p class="text-sm text-red-700 font-medium"><i class="fas fa-exclamation-circle mr-2"></i>{{ session('error') }}</p>
+        </div>
+    @endif
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        @if($consultations->count() > 0)
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50 border-b">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Data/Hora</th>
+                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Médico</th>
+                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Especialidade</th>
+                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
+                            <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        @foreach($consultations as $c)
+                            <tr class="hover:bg-gray-50 transition">
+                                <td class="px-6 py-4">
+                                    <p class="text-sm font-semibold text-gray-900">{{ \Carbon\Carbon::parse($c->scheduled_at)->format('d/m/Y') }}</p>
+                                    <p class="text-xs text-gray-500">{{ \Carbon\Carbon::parse($c->scheduled_at)->format('H:i') }}</p>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <p class="text-sm font-medium text-gray-900">Dr(a). {{ $c->doctor->name ?? 'Não atribuído' }}</p>
+                                </td>
+                                <td class="px-6 py-4">
+                                    <span class="text-sm text-gray-700">{{ $c->doctor->specialty->name ?? 'Clínica Geral' }}</span>
+                                </td>
+                                <td class="px-6 py-4">
+                                    @php
+                                        $statusColors = [
+                                            'agendada' => 'bg-blue-100 text-blue-800',
+                                            'confirmada' => 'bg-green-100 text-green-800',
+                                            'em_andamento' => 'bg-amber-100 text-amber-800',
+                                            'concluida' => 'bg-purple-100 text-purple-800',
+                                            'cancelada' => 'bg-red-100 text-red-800',
+                                            'faltou' => 'bg-gray-100 text-gray-800',
+                                        ];
+                                        $color = $statusColors[$c->status] ?? 'bg-gray-100 text-gray-800';
+                                    @endphp
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-full {{ $color }}">
+                                        {{ ucfirst(str_replace('_', ' ', $c->status)) }}
+                                    </span>
+                                </td>
+                                <td class="px-6 py-4 text-right">
+                                    <div class="flex items-center justify-end gap-2">
+                                        <a href="{{ route('patient.consultations.show', $c->id) }}" class="px-3 py-1.5 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-lg text-xs" title="Ver Detalhes">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        
+                                        @if($c->status === 'concluida' && !$c->rating)
+                                            <a href="{{ route('patient.consultations.rate', $c->id) }}" class="px-3 py-1.5 bg-yellow-50 text-yellow-700 hover:bg-yellow-100 rounded-lg text-xs font-medium" title="Avaliar Atendimento">
+                                                <i class="fas fa-star"></i> Avaliar
+                                            </a>
+                                        @elseif($c->rating)
+                                            <span class="px-3 py-1.5 bg-green-50 text-green-700 rounded-lg text-xs font-medium">
+                                                <i class="fas fa-check"></i> Avaliado ({{ $c->rating->rating }}/5)
+                                            </span>
+                                        @endif
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+            @if($consultations->hasPages())
+                <div class="px-6 py-4 border-t bg-gray-50">{{ $consultations->links() }}</div>
+            @endif
+        @else
+            <div class="p-12 text-center">
+                <i class="fas fa-calendar-times text-6xl text-gray-300 mb-4"></i>
+                <h4 class="text-lg font-semibold text-gray-700 mb-2">Nenhuma consulta encontrada</h4>
+                <p class="text-gray-500 mb-4">Você ainda não marcou nenhuma consulta no Makombe.</p>
+                <a href="{{ route('patient.schedule') }}" class="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl transition">
+                    <i class="fas fa-plus"></i> Marcar Primeira Consulta
+                </a>
+            </div>
+        @endif
+    </div>
+</x-layouts.patient>

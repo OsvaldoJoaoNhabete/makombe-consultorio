@@ -1,212 +1,168 @@
 <x-layouts.admin title="Pacientes">
 
-    <!-- Header -->
     <div class="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-            <h1 class="text-3xl font-bold text-gray-900 mb-2">👥 Pacientes</h1>
-            <p class="text-gray-600">Gestão de pacientes do consultório</p>
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">Pacientes</h1>
+            <p class="text-gray-600">Gestão completa de pacientes do consultório</p>
         </div>
-        <a href="{{ route('patients.create') }}" 
-           class="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg transition">
-            <i class="fas fa-user-plus"></i> Novo Paciente
-        </a>
-    </div>
-
-    <!-- Estatísticas -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <a href="{{ route('patients.index') }}" class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition">
-            <div class="flex items-center gap-3">
-                <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <i class="fas fa-users text-blue-600 text-xl"></i>
-                </div>
-                <div>
-                    <p class="text-xs text-gray-500 uppercase font-semibold">Total</p>
-                    <p class="text-2xl font-bold text-gray-900">{{ $stats['total'] }}</p>
-                </div>
-            </div>
-        </a>
-        <a href="{{ route('patients.index', ['status' => 'active']) }}" class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition">
-            <div class="flex items-center gap-3">
-                <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                    <i class="fas fa-check-circle text-green-600 text-xl"></i>
-                </div>
-                <div>
-                    <p class="text-xs text-green-600 uppercase font-semibold">Ativos</p>
-                    <p class="text-2xl font-bold text-green-700">{{ $stats['ativos'] }}</p>
-                </div>
-            </div>
-        </a>
-        <a href="{{ route('patients.index', ['status' => 'inactive']) }}" class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition">
-            <div class="flex items-center gap-3">
-                <div class="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                    <i class="fas fa-times-circle text-red-600 text-xl"></i>
-                </div>
-                <div>
-                    <p class="text-xs text-red-600 uppercase font-semibold">Inativos</p>
-                    <p class="text-2xl font-bold text-red-700">{{ $stats['inativos'] }}</p>
-                </div>
-            </div>
-        </a>
-        <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
-            <div class="flex items-center gap-3">
-                <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <i class="fas fa-calendar-plus text-purple-600 text-xl"></i>
-                </div>
-                <div>
-                    <p class="text-xs text-purple-600 uppercase font-semibold">Hoje</p>
-                    <p class="text-2xl font-bold text-purple-700">{{ $stats['hoje'] }}</p>
-                </div>
-            </div>
+        <div class="flex gap-3">
+            <a href="{{ route('patients.create') }}" class="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl shadow-lg transition">
+                <i class="fas fa-plus"></i> Novo Paciente
+            </a>
         </div>
     </div>
 
-    <!-- Filtros -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
-        <form method="GET" action="{{ route('patients.index') }}" class="flex flex-col md:flex-row gap-3">
-            <div class="flex-1 relative">
-                <input type="text" name="search" value="{{ $search }}" 
-                       placeholder="🔍 Buscar por nome, NID, telefone ou email..."
-                       class="w-full px-4 py-2.5 pl-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+    @if (session('success'))
+        <div class="mb-6 bg-green-50 border-l-4 border-green-500 p-4 rounded-r-lg shadow-sm">
+            <p class="text-sm text-green-700 font-medium"><i class="fas fa-check-circle mr-2"></i>{{ session('success') }}</p>
+        </div>
+    @endif
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div class="p-6 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div class="relative flex-1">
+                <input type="text" name="search" placeholder="Buscar paciente..." 
+                       value="{{ request('search') }}"
+                       class="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition"
+                       autofocus>
                 <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
             </div>
-            <select name="status" class="px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="all" {{ $status === 'all' ? 'selected' : '' }}>Todos os Status</option>
-                <option value="active" {{ $status === 'active' ? 'selected' : '' }}>✅ Ativos</option>
-                <option value="inactive" {{ $status === 'inactive' ? 'selected' : '' }}>❌ Inativos</option>
-            </select>
-            <select name="gender" class="px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="all" {{ $gender === 'all' ? 'selected' : '' }}>Todos os Géneros</option>
-                <option value="masculino" {{ $gender === 'masculino' ? 'selected' : '' }}>♂ Masculino</option>
-                <option value="feminino" {{ $gender === 'feminino' ? 'selected' : '' }}>♀ Feminino</option>
-                <option value="outro" {{ $gender === 'outro' ? 'selected' : '' }}>⚧ Outro</option>
-            </select>
-            <button type="submit" class="px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium">
-                <i class="fas fa-filter mr-1"></i> Filtrar
-            </button>
-            <a href="{{ route('patients.index') }}" class="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition font-medium">
-                <i class="fas fa-redo mr-1"></i> Limpar
-            </a>
-        </form>
-    </div>
-
-    <!-- Tabela de Pacientes -->
-    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        @if($patients->count() > 0)
-            <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-gray-50 border-b border-gray-200">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Paciente</th>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">NID</th>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Contacto</th>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Género</th>
-                            <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Status</th>
-                            <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100">
-                        @foreach($patients as $patient)
-                            <tr class="hover:bg-gray-50 transition">
-                                <td class="px-6 py-4">
-                                    <div class="flex items-center gap-3">
-                                        <div class="h-10 w-10 rounded-full overflow-hidden bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold flex-shrink-0">
-                                            @if($patient->hasPhoto())
-                                                <img src="{{ $patient->getPhotoUrl() }}" alt="{{ $patient->full_name }}" class="w-full h-full object-cover">
-                                            @else
-                                                {{ strtoupper(substr($patient->full_name, 0, 1)) }}
-                                            @endif
-                                        </div>
-                                        <div>
-                                            <p class="font-semibold text-gray-900 text-sm">{{ $patient->full_name }}</p>
-                                            <p class="text-xs text-gray-500">{{ $patient->email }}</p>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="px-6 py-4">
-                                    <span class="text-xs font-mono bg-gray-100 px-2 py-1 rounded">{{ $patient->nid }}</span>
-                                </td>
-                                <td class="px-6 py-4">
-                                    <p class="text-sm text-gray-900">
-                                        <i class="fas fa-phone text-gray-400 mr-1 text-xs"></i> +258 {{ $patient->phone }}
-                                    </p>
-                                </td>
-                                <td class="px-6 py-4">
-                                    @php
-                                        $genderIcon = match($patient->gender) {
-                                            'masculino' => '♂ Masculino',
-                                            'feminino' => '♀ Feminino',
-                                            default => '⚧ Outro',
-                                        };
-                                    @endphp
-                                    <span class="text-sm">{{ $genderIcon }}</span>
-                                </td>
-                                <td class="px-6 py-4">
-                                    <span class="px-2 py-1 text-xs font-semibold rounded-full {{ $patient->is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
-                                        {{ $patient->is_active ? '✅ Ativo' : '❌ Inativo' }}
-                                    </span>
-                                </td>
-                                <td class="px-6 py-4 text-right">
-                                    <div class="flex items-center justify-end gap-2">
-                                        <a href="{{ route('patients.show', $patient->id) }}" 
-                                           class="px-3 py-1.5 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-lg transition text-xs font-medium"
-                                           title="Ver detalhes">
-                                            <i class="fas fa-eye"></i>
-                                        </a>
-                                        <a href="{{ route('patients.edit', $patient->id) }}" 
-                                           class="px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition text-xs font-medium"
-                                           title="Editar">
-                                            <i class="fas fa-edit"></i>
-                                        </a>
-                                        <form method="POST" action="{{ route('patients.toggleStatus', $patient->id) }}" class="inline">
-                                            @csrf
-                                            <button type="submit" 
-                                                    onclick="return confirm('{{ $patient->is_active ? 'Desativar' : 'Ativar' }} este paciente?');"
-                                                    class="px-3 py-1.5 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-lg transition text-xs font-medium"
-                                                    title="{{ $patient->is_active ? 'Desativar' : 'Ativar' }}">
-                                                <i class="fas fa-{{ $patient->is_active ? 'ban' : 'check' }}"></i>
-                                            </button>
-                                        </form>
-                                        <form method="POST" action="{{ route('patients.destroy', $patient->id) }}" 
-                                              onsubmit="return confirm('Tem certeza que deseja excluir este paciente?');"
-                                              class="inline">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" 
-                                                    class="px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition text-xs font-medium"
-                                                    title="Excluir">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </form>
-                                    </div>
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-
-            @if($patients->hasPages())
-                <div class="px-6 py-4 border-t border-gray-200 bg-gray-50">
-                    {{ $patients->links() }}
-                </div>
-            @endif
-        @else
-            <div class="p-12 text-center">
-                <i class="fas fa-users text-6xl text-gray-300 mb-4"></i>
-                <h4 class="text-lg font-semibold text-gray-700 mb-2">Nenhum paciente encontrado</h4>
-                <p class="text-gray-500 mb-4">
-                    @if($search || $status !== 'all' || $gender !== 'all')
-                        Não há pacientes para os filtros selecionados.
-                    @else
-                        Comece por criar o primeiro paciente.
-                    @endif
-                </p>
-                <a href="{{ route('patients.create') }}" 
-                   class="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition">
-                    <i class="fas fa-user-plus"></i> Criar Primeiro Paciente
+            
+            <div class="flex flex-wrap gap-2">
+                <a href="{{ route('patients.index', ['status' => 'all']) }}" 
+                   class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg {{ request('status') === 'all' ? 'bg-purple-50 text-purple-600 font-medium' : '' }}">
+                    Todos
+                </a>
+                <a href="{{ route('patients.index', ['status' => 'active']) }}" 
+                   class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg {{ request('status') === 'active' ? 'bg-purple-50 text-purple-600 font-medium' : '' }}">
+                    Ativos
+                </a>
+                <a href="{{ route('patients.index', ['status' => 'inactive']) }}" 
+                   class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg {{ request('status') === 'inactive' ? 'bg-purple-50 text-purple-600 font-medium' : '' }}">
+                    Inativos
                 </a>
             </div>
-        @endif
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead class="bg-gray-50 border-b border-gray-100">
+                    <tr>
+                        <th class="px-6 py-4 font-semibold text-gray-600">Nome Completo</th>
+                        <th class="px-6 py-4 font-semibold text-gray-600">NID / BI</th>
+                        <th class="px-6 py-4 font-semibold text-gray-600">Idade</th>
+                        <th class="px-6 py-4 font-semibold text-gray-600">Género</th>
+                        <th class="px-6 py-4 font-semibold text-gray-600">Telemóvel</th>
+                        <th class="px-6 py-4 font-semibold text-gray-600">Estado</th>
+                        <th class="px-6 py-4 font-semibold text-gray-600">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($patients as $patient)
+                        <tr class="border-b border-gray-100 hover:bg-gray-50 transition">
+                            <td class="px-6 py-4">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 text-sm font-bold">
+                                        {{ $patient->getInitial() }}
+                                    </div>
+                                    <div>
+                                        <p class="font-medium text-gray-900">{{ $patient->full_name }}</p>
+                                        <p class="text-xs text-gray-500">{{ $patient->email ?? 'Não informado' }}</p>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4">
+                                <p class="font-medium text-gray-900">{{ $patient->nid }}</p>
+                                <p class="text-xs text-gray-500">{{ $patient->bi_number ?? 'Não informado' }}</p>
+                            </td>
+                            <td class="px-6 py-4">
+                                @if($patient->birth_date)
+                                    {{ $patient->age }} anos
+                                @else
+                                    Não informado
+                                @endif
+                            </td>
+                            <td class="px-6 py-4">
+                                {{ $patient->gender ? ucfirst($patient->gender) : 'Não informado' }}
+                            </td>
+                            <td class="px-6 py-4">
+                                <a href="tel:{{ $patient->phone }}" class="text-purple-600 hover:text-purple-800 font-medium">
+                                    +258 {{ $patient->phone }}
+                                </a>
+                            </td>
+                            <td class="px-6 py-4">
+                                @if($patient->is_active)
+                                    <span class="px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                                        <i class="fas fa-check-circle mr-1"></i> Ativo
+                                    </span>
+                                @else
+                                    <span class="px-3 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                                        <i class="fas fa-ban mr-1"></i> Inativo
+                                    </span>
+                                @endif
+                            </td>
+                            <td class="px-6 py-4">
+                                <div class="flex gap-2">
+                                    <a href="{{ route('patients.show', $patient->id) }}" class="p-2 text-gray-500 hover:text-purple-600 rounded-lg hover:bg-purple-50 transition">
+                                        <i class="fas fa-eye" title="Ver detalhes"></i>
+                                    </a>
+                                    @canany(['Administrador', 'Gerente'])
+                                        <a href="{{ route('patients.edit', $patient->id) }}" class="p-2 text-gray-500 hover:text-blue-600 rounded-lg hover:bg-blue-50 transition">
+                                            <i class="fas fa-edit" title="Editar"></i>
+                                        </a>
+                                        <form action="{{ route('patients.toggle-status', $patient->id) }}" method="POST" class="inline">
+                                            @csrf
+                                            <button type="submit" class="p-2 text-gray-500 hover:text-red-600 rounded-lg hover:bg-red-50 transition" title="Alterar estado">
+                                                @if($patient->is_active)
+                                                    <i class="fas fa-ban"></i>
+                                                @else
+                                                    <i class="fas fa-check-circle"></i>
+                                                @endif
+                                            </button>
+                                        </form>
+                                    @endcanany
+                                </div>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="7" class="px-6 py-12 text-center text-gray-500">
+                                <i class="fas fa-users text-4xl mb-3"></i>
+                                <p class="text-lg font-medium">Nenhum paciente encontrado</p>
+                                <p class="text-gray-500 mt-1">Tente ajustar os filtros ou crie um novo paciente</p>
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+
+        <div class="p-4 border-t border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between">
+            <div class="text-gray-500 text-sm mb-3 md:mb-0">
+                Mostrando {{ $patients->firstItem() }} a {{ $patients->lastItem() }} de {{ $patients->total() }} resultados
+            </div>
+            <div class="flex justify-center">
+                {{ $patients->links() }}
+            </div>
+        </div>
     </div>
 
+    <div class="mt-8 grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <p class="text-sm text-gray-500">Total de Pacientes</p>
+            <p class="text-2xl font-bold text-gray-900 mt-1">{{ $stats['total'] }}</p>
+        </div>
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <p class="text-sm text-gray-500">Pacientes Ativos</p>
+            <p class="text-2xl font-bold text-gray-900 mt-1">{{ $stats['ativos'] }}</p>
+        </div>
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <p class="text-sm text-gray-500">Pacientes Inativos</p>
+            <p class="text-2xl font-bold text-gray-900 mt-1">{{ $stats['inativos'] }}</p>
+        </div>
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+            <p class="text-sm text-gray-500">Pacientes Hoje</p>
+            <p class="text-2xl font-bold text-gray-900 mt-1">{{ $stats['hoje'] }}</p>
+        </div>
+    </div>
 </x-layouts.admin>

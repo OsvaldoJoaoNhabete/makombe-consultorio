@@ -18,6 +18,9 @@
                     <i class="fas fa-check"></i> Concluir
                 </button>
             </form>
+            <a href="{{ route('consultations.print.note', $consultation->id) }}" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition">
+    <i class="fas fa-print"></i> Imprimir Nota Médica
+</a>
             <form method="POST" action="{{ route('consultations.cancel', $consultation->id) }}" class="inline">
                 @csrf
                 <button type="submit" onclick="return confirm('Cancelar consulta?');"
